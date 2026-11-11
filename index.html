@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Visor SIGPAC de toda España en tu móvil · Surco</title>
+    <meta
+      name="description"
+      content="Visor SIGPAC gratis y sin cuenta: busca tu parcela por provincia, municipio, polígono y parcela y mira en el mapa su superficie y su uso, desde el móvil o el ordenador."
+    />
+    <link rel="canonical" href="https://surcoapp.es/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="es_ES" />
+    <meta property="og:url" content="https://surcoapp.es/" />
+    <meta property="og:title" content="Visor SIGPAC de toda España en tu móvil" />
+    <meta property="og:description" content="Busca tu parcela por polígono y parcela y mira su superficie y su uso. Gratis y sin cuenta." />
+    <meta property="og:image" content="https://surcoapp.es/icono-512.png" />
+    <!-- Safari no usa el SVG en la pestaña: tira de los PNG. Chrome se queda con el SVG, que va el último. -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/icono-32.png?v=2" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/icono-16.png?v=2" />
+    <link rel="icon" type="image/svg+xml" href="/icono.svg?v=2" />
+    <link rel="apple-touch-icon" href="/icono-apple.png?v=2" />
+    <meta name="theme-color" content="#3B6D11" />
+    <!-- Lo que tarda en llegar al abrir: el mapa del IGN y el SIGPAC del FEGA. -->
+    <link rel="preconnect" href="https://www.ign.es" crossorigin />
+    <link rel="preconnect" href="https://sigpac-hubcloud.es" crossorigin />
+    <!-- Tema antes de pintar, como en la app (index.html de app/) -->
+    <script>
+      try {
+        const t = sessionStorage.getItem('surco-tema')
+        if (t === 'dark' || (t !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches))
+          document.documentElement.classList.add('dark')
+      } catch (e) {}
+    </script>
+    <link rel="stylesheet" href="/fuentes/fuentes.css" />
+    <script type="module" crossorigin src="/assets/index-CktgqJuu.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/maplibre-C6WkC8Mu.js">
+    <link rel="stylesheet" crossorigin href="/assets/maplibre-DBE96hFo.css">
+    <link rel="stylesheet" crossorigin href="/assets/index-C0vebTMG.css">
+  <script data-goatcounter="https://surcoapp.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
+</head>
+  <body>
+    <!-- Lo de dentro lo ve quien no ejecuta JavaScript (y los buscadores); React lo sustituye por el visor. -->
+    <div id="root">
+      <h1>Visor SIGPAC de toda España</h1>
+      <p>
+        Gratis y sin cuenta: busca tu parcela por provincia, municipio, polígono y parcela y mira en el mapa su superficie y su uso. Datos
+        del SIGPAC, Fondo Español de Garantía Agraria (FEGA).
+      </p>
+      <p><a href="/inicio/">Conoce Surco</a> · <a href="/aviso-legal/">Aviso legal</a></p>
+    </div>
+  </body>
+</html>

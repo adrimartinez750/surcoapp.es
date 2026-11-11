@@ -1,0 +1,1485 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Surco · Tu parcela, de la siembra a la cosecha</title>
+<script>try { localStorage.removeItem('surco-tema'); const t = sessionStorage.getItem('surco-tema'); if (t === 'dark' || t === 'light') document.documentElement.dataset.theme = t; } catch (e) {}</script>
+<!-- Safari no usa el SVG en la pestaña: tira de los PNG. Chrome se queda con el SVG, que va el último. -->
+<link rel="icon" type="image/png" sizes="32x32" href="/icono-32.png?v=2">
+<link rel="icon" type="image/png" sizes="16x16" href="/icono-16.png?v=2">
+<link rel="icon" type="image/svg+xml" href="/icono.svg?v=2">
+<link rel="apple-touch-icon" href="/icono-apple.png?v=2">
+<link rel="stylesheet" href="/fuentes/fuentes.css">
+<style>
+/* Layout: la parcela 3D vive fija en un escenario (derecha en escritorio, arriba en móvil) y el texto pasa por al lado; el scroll es el calendario de la campaña. */
+:root {
+  --bg: #eceee6;
+  --fg: #192017;
+  --muted: #586153;
+  --line: #ccd2c4;
+  --panel: #e2e6da;
+  --maize: #c99316;
+  --soil-ap: #5d4330;
+  --soil-bw: #86664a;
+  --soil-c: #bba585;
+  --soil-top: #6e5139;
+  --machine: #1d5d9b;
+  --alert: #c0392b;
+  --water: #2f7fc4;
+  --plant: #3f7d27;
+  --tag-bg: #fafbf6;
+  --tag-fg: #192017;
+  --bezel: #1d231b;
+
+  --f-display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --f-body: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e120d; --fg: #e5e9dd; --muted: #98a291; --line: #283026; --panel: #151a14;
+    --maize: #e2ae36; --soil-ap: #503a29; --soil-bw: #735843; --soil-c: #a08e70; --soil-top: #634935;
+    --machine: #3f86c9; --alert: #e2604f; --water: #4d9be0; --plant: #4f8f33;
+    --tag-bg: #1b2119; --tag-fg: #e5e9dd; --bezel: #2a3227;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e120d; --fg: #e5e9dd; --muted: #98a291; --line: #283026; --panel: #151a14;
+  --maize: #e2ae36; --soil-ap: #503a29; --soil-bw: #735843; --soil-c: #a08e70; --soil-top: #634935;
+  --machine: #3f86c9; --alert: #e2604f; --water: #4d9be0; --plant: #4f8f33;
+  --tag-bg: #1b2119; --tag-fg: #e5e9dd; --bezel: #2a3227;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+/* Los enlaces del menú dejan la sección bajo la barra fija; el de un paso, con su texto en la línea */
+[id] { scroll-margin-top: var(--cab-h, 72px); }
+.paso[id] { scroll-margin-top: var(--linea, 22vh); }
+body {
+  background: var(--bg); color: var(--fg);
+  font-family: var(--f-body); font-size: 18px; line-height: 1.55;
+  --gut: clamp(16px, 4vw, 56px);
+  padding-inline: var(--gut);
+}
+a { color: inherit; }
+:focus-visible { outline: 2px solid var(--maize); outline-offset: 3px; }
+
+/* Cabecera */
+.cab {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-block: 18px;
+  /* siempre a mano: se queda arriba al hacer scroll */
+  position: sticky; top: 0; z-index: 20; margin-inline: calc(-1 * var(--gut)); padding-inline: var(--gut);
+  background: color-mix(in srgb, var(--bg) 90%, transparent); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+}
+.marca { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+.marca svg { width: 30px; height: 30px; }
+.marca span { font-family: var(--f-display); font-stretch: 125%; font-weight: 800; font-size: 22px; letter-spacing: -0.01em; }
+.cab nav { display: flex; gap: 20px; align-items: center; font-family: var(--f-display); font-size: 15px; }
+.cab nav a { text-decoration: none; color: var(--muted); }
+.cab nav a:hover { color: var(--fg); }
+.cab nav .entrar { color: var(--fg); border: 1px solid var(--line); padding: 7px 14px; border-radius: 999px; }
+.tema {
+  width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--line);
+  background: transparent; color: var(--fg); display: grid; place-items: center; cursor: pointer; padding: 0;
+}
+.tema:hover { border-color: var(--fg); }
+.tema svg { width: 18px; height: 18px; }
+.tema .sol { display: none; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .tema .sol { display: block; } :root:not([data-theme="light"]) .tema .luna { display: none; } }
+:root[data-theme="dark"] .tema .sol { display: block; }
+:root[data-theme="dark"] .tema .luna { display: none; }
+
+/* Historia: escenario fijo + pasos */
+.historia { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); column-gap: clamp(24px, 4vw, 64px); }
+.escenario {
+  grid-column: 2; grid-row: 1;
+  position: sticky; top: var(--cab-h, 72px);
+  height: calc(100vh - var(--cab-h, 72px)); align-self: start;
+  display: flex; flex-direction: column; padding-block: 20px;
+}
+.lienzo { position: relative; flex: 1; min-height: 0; }
+.lienzo canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.sin3d { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 24px; font-family: var(--f-mono); font-size: 13px; color: var(--muted); }
+.ficha { font-family: var(--f-mono); font-size: 12px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 6px 18px; letter-spacing: 0.02em; }
+.ficha b { color: var(--fg); font-weight: 500; }
+
+.leyenda {
+  position: absolute; left: 0; top: 4px;
+  font-family: var(--f-mono); font-size: 11.5px; color: var(--muted);
+  display: grid; gap: 6px; width: min(240px, 60%);
+  transition: opacity .35s ease; pointer-events: none;
+}
+.leyenda .rampa { height: 8px; border-radius: 2px; }
+.leyenda .ext { display: flex; justify-content: space-between; }
+.leyenda .tit { color: var(--fg); }
+
+/* Etiquetas sobre la escena 3D */
+.etiquetas { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.etq { position: absolute; left: 0; top: 0; width: 0; height: 0; opacity: 0; will-change: transform, opacity; }
+.etq i { position: absolute; left: -3.5px; top: -3.5px; width: 7px; height: 7px; border-radius: 50%; background: var(--fg); box-shadow: 0 0 0 3px color-mix(in srgb, var(--bg) 70%, transparent); }
+.etq::after { content: ""; position: absolute; left: 0; bottom: 0; width: 1px; height: 22px; background: var(--fg); opacity: .6; }
+.etq span {
+  position: absolute; bottom: 22px; left: -10px;
+  font-family: var(--f-mono); font-size: 12px; line-height: 1.3; white-space: nowrap;
+  background: var(--tag-bg); color: var(--tag-fg); border: 1px solid var(--line);
+  padding: 5px 9px; border-radius: 4px; display: flex; gap: 7px; align-items: center;
+  box-shadow: 0 6px 18px -10px rgba(0,0,0,.4);
+}
+.etq.izq span { left: auto; right: -10px; }
+.etq.abajo::after { bottom: auto; top: 0; }
+.etq.abajo span { bottom: auto; top: 22px; }
+.etq b { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--c, var(--maize)); }
+
+.calendario { display: grid; gap: 8px; padding-top: 10px; }
+.calendario .fase { font-family: var(--f-display); font-stretch: 112%; font-weight: 650; font-size: 15px; display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.calendario .fase small { font-family: var(--f-mono); font-weight: 400; font-size: 12px; color: var(--muted); font-stretch: 100%; }
+.barra { position: relative; height: 2px; background: var(--line); }
+.barra .relleno { position: absolute; inset: 0 auto 0 0; background: var(--fg); width: 0; }
+.barra .punto { position: absolute; top: 50%; width: 10px; height: 10px; border-radius: 50%; background: var(--maize); transform: translate(-50%, -50%); left: 0; }
+.meses { display: flex; justify-content: space-between; font-family: var(--f-mono); font-size: 11px; color: var(--muted); letter-spacing: 0.04em; text-transform: uppercase; }
+
+.pasos { grid-column: 1; grid-row: 1; min-width: 0; }
+/* Cada paso es un tramo de scroll; su texto está fijo en el mismo sitio y solo se ve el del paso en
+   curso: al bajar un poco más de la cuenta se va hacia arriba y aparece el siguiente, sin juntarse. */
+.paso { min-height: 160vh; max-width: 34rem; } /* todos iguales: cada texto dura lo mismo, y da tiempo a ver pasar las máquinas */
+/* Cada texto se queda quieto (sticky) mientras se sigue bajando un trecho y la parcela avanza; luego se va */
+.pin {
+  display: flex; flex-direction: column; gap: 18px;
+  position: fixed; z-index: 1; top: var(--linea, 22vh); left: var(--col-x, 56px); width: var(--col-w, 34rem);
+  opacity: 0; visibility: hidden; transform: translateY(18px);
+  transition: opacity .35s ease, transform .45s ease, visibility 0s linear .45s;
+}
+.paso.pasado .pin { transform: translateY(-18px); }
+.pin.ver { opacity: 1; visibility: visible; transform: none; transition: opacity .35s ease, transform .45s ease; }
+/* El último texto no es fijo: se queda pegado mientras dura su tramo y luego se va con la página */
+.paso:last-child .pin { position: sticky; left: auto; width: auto; }
+.paso:first-child { min-height: calc(100vh - 80px); display: flex; flex-direction: column; justify-content: center; }
+.paso:first-child .pin { position: static; width: auto; opacity: 1; visibility: visible; transform: none; }
+
+.cuando { font-family: var(--f-mono); font-size: 12.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); display: flex; align-items: center; gap: 10px; }
+.cuando::before { content: ""; width: 18px; height: 2px; background: var(--maize); }
+h1, h2 { font-family: var(--f-display); font-stretch: 118%; font-weight: 800; letter-spacing: -0.02em; line-height: 1.02; margin: 0; text-wrap: balance; }
+h1 { font-size: clamp(42px, 6.2vw, 84px); }
+h2 { font-size: clamp(30px, 3.6vw, 48px); }
+.paso p { margin: 0; max-width: 32rem; }
+.paso .entradilla { font-size: 21px; color: var(--muted); }
+.dato { font-family: var(--f-mono); font-size: 13px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 12px; display: flex; flex-wrap: wrap; gap: 6px 20px; }
+.dato b { color: var(--fg); font-weight: 500; }
+
+.botones { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.btn { font-family: var(--f-display); font-weight: 650; font-size: 16px; text-decoration: none; padding: 13px 22px; border-radius: 999px; border: 1px solid var(--fg); background: var(--fg); color: var(--bg); }
+.btn.sec { background: transparent; color: var(--fg); border-color: var(--line); }
+
+.cuaderno { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
+.cuaderno li { display: grid; grid-template-columns: 4.6rem minmax(0, 1fr); gap: 14px; padding-block: 9px; border-bottom: 1px solid var(--line); font-size: 16px; transition: transform .5s ease; }
+.cuaderno time { font-family: var(--f-mono); font-size: 13px; color: var(--muted); padding-top: 2px; font-variant-numeric: tabular-nums; }
+.paso:not(.activo) .cuaderno li { transform: translateY(6px); }
+
+.votos { display: grid; gap: 12px; }
+.voto { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 14px; align-items: baseline; font-size: 16px; }
+.voto .n { font-family: var(--f-mono); font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.voto .b { grid-column: 1 / -1; height: 4px; background: var(--line); border-radius: 2px; overflow: hidden; }
+.voto .b i { display: block; height: 100%; background: var(--maize); }
+.nota { font-family: var(--f-mono); font-size: 11.5px; color: var(--muted); }
+
+/* La app por dentro */
+.dentro { border-top: 1px solid var(--line); padding-block: clamp(64px, 9vw, 120px); display: grid; gap: clamp(28px, 4vw, 48px); }
+.dentro .cabeza { display: grid; gap: 16px; max-width: 40rem; }
+.dentro .cabeza p { margin: 0; color: var(--muted); font-size: 20px; }
+.visor { display: grid; grid-template-columns: minmax(0, 4fr) minmax(0, 9fr); gap: clamp(20px, 3vw, 48px); align-items: start; }
+.pestanas { display: grid; gap: 4px; border-left: 1px solid var(--line); }
+.pestana {
+  all: unset; cursor: pointer; display: grid; gap: 4px;
+  padding: 12px 0 12px 18px; margin-left: -1px; border-left: 2px solid transparent;
+}
+.pestana strong { font-family: var(--f-display); font-stretch: 112%; font-weight: 700; font-size: 18px; color: var(--muted); }
+.pestana span { font-size: 15.5px; color: var(--muted); line-height: 1.45; display: none; }
+.pestana[aria-selected="true"] { border-left-color: var(--maize); }
+.pestana[aria-selected="true"] strong { color: var(--fg); }
+.pestana[aria-selected="true"] span { display: block; }
+.pestana:focus-visible { outline: 2px solid var(--maize); outline-offset: 2px; }
+.marco { margin: 0; background: var(--bezel); border-radius: 18px; padding: 10px; box-shadow: 0 30px 60px -30px rgba(0,0,0,.45); }
+.marco .pantalla { border-radius: 9px; overflow: hidden; background: #fff; aspect-ratio: 1280 / 860; max-width: 100%; }
+.marco img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top center; }
+.marco { position: relative; }
+.marco .telefono { position: absolute; right: 22px; bottom: 46px; width: 21%; background: var(--bezel); border-radius: 20px; padding: 6px; box-shadow: 0 24px 40px -18px rgba(0,0,0,.55); }
+.marco .telefono img { border-radius: 14px; aspect-ratio: 390 / 760; height: auto; }
+.marco figcaption { font-family: var(--f-mono); font-size: 11.5px; color: #b7bfb0; padding: 9px 4px 1px; display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+
+.cierre { border-top: 1px solid var(--line); padding-block: clamp(64px, 10vw, 120px); display: grid; gap: 22px; justify-items: start; }
+.cierre h2 { font-size: clamp(36px, 5vw, 68px); max-width: 16ch; }
+.cierre p { margin: 0; max-width: 34rem; color: var(--muted); font-size: 20px; }
+footer { border-top: 1px solid var(--line); padding-block: 24px 36px; font-family: var(--f-mono); font-size: 12px; color: var(--muted); display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px; }
+
+@media (max-width: 860px) {
+  body { font-size: 17px; }
+  /* La portada va antes que la parcela: al entrar se ve entera y la parcela asoma debajo; al bajar,
+     la parcela sube hasta la mitad de la pantalla y se queda ahí con los textos encima. */
+  .historia { display: flex; flex-direction: column; }
+  .pasos { display: contents; }
+  .paso { order: 2; }
+  .paso:nth-child(2) { margin-top: calc(-1 * var(--esc-h)); } /* los textos empiezan arriba, por detrás de la parcela */
+  .paso:first-child { order: 0; }
+  .escenario { order: 1; align-self: stretch; }
+  /* En el móvil se lee arriba, bajo la barra, y la parcela va pegada abajo: la mitad inferior de la
+     pantalla. El primer texto sube por detrás de ella (margen negativo) para que la parcela no ocupe
+     sitio; el hueco del final es lo que ocupa la parcela cuando se va con el último texto. */
+  :root { --esc-h: 50svh; }
+  .historia::after { content: ""; order: 3; flex: none; height: var(--esc-h); }
+  .escenario {
+    top: calc(100dvh - var(--esc-h)); height: var(--esc-h);
+    z-index: 2; background: var(--bg); padding-block: 10px 8px; border-top: 1px solid var(--line);
+  }
+  .ficha { display: none; }
+  .paso { min-height: 150vh; }
+  .paso:first-child { min-height: 0; padding-block: 28px 36px; }
+  /* Los textos tienen que caber en la mitad de arriba: más compactos y sin las filas de relleno */
+  .pin { gap: 12px; padding-top: 14px; }
+  h2 { font-size: 26px; }
+  .paso p { font-size: 16px; line-height: 1.45; }
+  .dato { font-size: 12px; padding-top: 9px; gap: 4px 14px; }
+  .cuaderno li { padding-block: 6px; font-size: 14.5px; grid-template-columns: 3.8rem minmax(0, 1fr); }
+  .cuaderno time { font-size: 12px; }
+  .cuaderno li:nth-child(-n+4):not(:first-child) { display: none; }
+  .votos { gap: 8px; }
+  .voto { font-size: 14.5px; }
+  .paso .entradilla { font-size: 18px; }
+  .cab nav a:not(.entrar) { display: none; }
+  .etq span { font-size: 10.5px; padding: 4px 7px; }
+  .leyenda { width: 42%; font-size: 10px; gap: 4px; }
+  .visor { grid-template-columns: minmax(0, 1fr); }
+  .pestanas { display: flex; overflow-x: auto; border-left: 0; border-bottom: 1px solid var(--line); gap: 18px; }
+  .pestana { padding: 8px 0; margin: 0 0 -1px; border-left: 0; border-bottom: 2px solid transparent; white-space: nowrap; }
+  .pestana[aria-selected="true"] { border-bottom-color: var(--maize); }
+  .pestana[aria-selected="true"] span { display: none; }
+  .pestana strong { font-size: 16px; }
+  .marco { padding: 6px; border-radius: 12px; }
+  .marco .pantalla { display: none; }
+  .marco .telefono { position: static; width: min(300px, 78%); margin: 4px auto 0; box-shadow: none; padding: 0; background: none; }
+  .marco:has(.telefono) { background: none; box-shadow: none; padding: 0; }
+  .marco:has(.telefono) figcaption { color: var(--muted); justify-content: center; }
+}
+@media (max-width: 860px) and (max-height: 740px) { :root { --esc-h: 42svh; } } /* móviles bajos: más sitio al texto */
+/* Sin 3D no hay quien mueva los textos fijos: van uno detrás de otro, como un texto normal */
+.sin-fijos .paso { min-height: 0; padding-block: 12vh; }
+.sin-fijos .pin { position: static; width: auto; opacity: 1; visibility: visible; transform: none; }
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .paso, .pin, .cuaderno li, .leyenda, body { transition: none; }
+}
+</style>
+<style>
+/* surcoapp.es: los botones «Me interesa» son botones, no enlaces. */
+button.me-interesa { cursor: pointer; }
+.cab nav button.entrar { background: transparent; font: inherit; }
+.gracias { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 50; width: max-content; max-width: calc(100vw - 32px); box-sizing: border-box; padding: 12px 18px; border-radius: 14px; background: var(--fg); color: var(--bg); box-shadow: 0 8px 24px rgba(0,0,0,.25); }
+</style>
+<script data-goatcounter="https://surcoapp.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
+</head>
+<body>
+
+<header class="cab">
+  <a class="marca" href="/">
+    <svg viewBox="0 0 100 100" aria-hidden="true">
+      <rect width="100" height="100" rx="24" fill="#3B6D11"/>
+      <g transform="translate(50 50) scale(0.74) translate(-50 -50)" fill="none" stroke-width="6.4" stroke-linecap="round">
+        <path d="M78 29 H35 A6 6 0 0 0 35 41 H65 A24 24 0 0 1 65 89 H18" stroke="#EAF3DE"/>
+        <path d="M80 20 H35 A15 15 0 0 0 35 50 H65 A15 15 0 0 1 65 80 H20" stroke="#A9D46F"/>
+        <path d="M82 11 H35 A24 24 0 0 0 35 59 H65 A6 6 0 0 1 65 71 H22" stroke="#EAF3DE"/>
+      </g>
+    </svg>
+    <span>Surco</span>
+  </a>
+  <nav>
+    <a href="#como">Cómo funciona</a>
+    <a href="#app">La app</a>
+    <a href="#comunidad">Comunidad</a>
+    <button class="tema" id="tema" type="button" aria-label="Cambiar entre modo claro y oscuro">
+      <svg class="luna" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5z"/></svg>
+      <svg class="sol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+    </button>
+        <button class="entrar me-interesa" type="button">Me interesa</button>  </nav>
+</header>
+
+<main class="historia" id="como">
+  <aside class="escenario" aria-label="Parcela de maíz de ejemplo a lo largo de la campaña">
+    <div class="ficha">
+      <span>Campaña <b>2026</b></span>
+      <span>Cultivo <b>Maíz grano</b></span>
+      <span>Recinto <b>12-145-3</b></span>
+      <span>Superficie <b>4,62 ha</b></span>
+    </div>
+    <div class="lienzo">
+      <canvas id="campo" role="img" aria-label="Parcela de maíz en 3D que se siembra, crece y se cosecha mientras bajas por la página"></canvas>
+      <div class="etiquetas" id="etiquetas"></div>
+      <div class="leyenda" id="leyenda" style="opacity:0">
+        <span class="tit" id="leyendaTit">Vigor de campañas anteriores</span>
+        <div class="rampa" id="leyendaRampa"></div>
+        <div class="ext"><span id="leyendaMin">bajo</span><span id="leyendaMax">alto</span></div>
+      </div>
+    </div>
+    <div class="calendario">
+      <div class="fase"><span id="fase">Febrero · alta de la parcela</span><small id="dia">antes de sembrar</small></div>
+      <div class="barra"><div class="relleno" id="relleno"></div><div class="punto" id="punto"></div></div>
+      <div class="meses"><span>Feb</span><span>Mar</span><span>Abr</span><span>May</span><span>Jun</span><span>Jul</span><span>Ago</span><span>Sep</span><span>Oct</span></div>
+    </div>
+  </aside>
+
+  <div class="pasos">
+    <section class="paso activo" data-i="0">
+      <div class="pin">
+        <div class="cuando">Para el agricultor</div>
+        <h1>Tu parcela, de la siembra a la cosecha.</h1>
+        <p class="entradilla">Surco junta en una sola aplicación lo que dice el satélite, el tiempo y tu suelo. Para que decidas con datos de tu propia tierra.</p>
+        <div class="botones">
+                    <button class="btn me-interesa" type="button">Me interesa</button>          <a class="btn sec" href="#app">Ver la app por dentro</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="paso" data-i="1" id="alta">
+      <div class="pin">
+        <div class="cuando">Febrero · alta</div>
+        <h2>Pones la referencia SIGPAC y ya está.</h2>
+        <p>Surco trae el contorno del recinto, la superficie, la pendiente y su uso en el SIGPAC. No hay que dibujar nada ni rellenar fichas.</p>
+        <div class="dato"><span>Polígono <b>12</b></span><span>Parcela <b>145</b></span><span>Recinto <b>3</b></span><span>Uso <b>Tierra arable</b></span></div>
+      </div>
+    </section>
+
+    <section class="paso" data-i="2">
+      <div class="pin">
+        <div class="cuando">Marzo · antes de sembrar</div>
+        <h2>Sabes qué tierra pisas.</h2>
+        <p>Textura, pH, materia orgánica y cuánta agua es capaz de guardar tu suelo, sacados de los mapas de suelo públicos. Con eso Surco calcula el riego para tu tierra en concreto.</p>
+        <div class="dato"><span>Textura <b>franco-arcillosa</b></span><span>pH <b>7,9</b></span><span>M.O. <b>1,8 %</b></span><span>Agua útil <b>165 mm/m</b></span></div>
+      </div>
+    </section>
+
+    <section class="paso" data-i="3">
+      <div class="pin">
+        <div class="cuando">Abril · siembra y abonado de fondo</div>
+        <h2>Sabes dónde la tierra rinde menos.</h2>
+        <p>El satélite marca las zonas que se quedaron flojas en campañas anteriores, y el plan de abonado te dice cuánto nitrógeno puedes echar según la cosecha que esperas y las normas de tu zona.</p>
+        <div class="dato"><span>Zonas <b>3 · una floja</b></span><span>Abonado <b>según la cosecha esperada</b></span></div>
+      </div>
+    </section>
+
+    <section class="paso" data-i="4">
+      <div class="pin">
+        <div class="cuando">Junio · riego</div>
+        <h2>Ahorra agua: riega lo que pide la planta.</h2>
+        <p>Con lo que ha llovido, la previsión de la semana y lo que guarda tu suelo, Surco te dice cuándo regar y cuánto. Si va a llover el martes, lo sabes antes de abrir el riego.</p>
+        <div class="dato"><span>Próximo riego <b>jueves · 28 mm</b></span><span>Lluvia prevista <b>12 mm el martes</b></span></div>
+      </div>
+    </section>
+
+    <section class="paso" data-i="5">
+      <div class="pin">
+        <div class="cuando">Junio–julio · crecimiento</div>
+        <h2>Ves el campo entero sin recorrerlo.</h2>
+        <p>El satélite fotografía tu parcela cada pocos días. Surco te enseña cómo va cada rincón y te avisa cuando una zona se queda atrás respecto al resto, para que vayas a mirarla a tiempo.</p>
+        <div class="dato"><span>Última imagen <b>hace 2 días</b></span><span>Aviso <b>zona oeste, 9 días por detrás</b></span></div>
+      </div>
+    </section>
+
+    <section class="paso" data-i="6">
+      <div class="pin">
+        <div class="cuando">Julio–agosto · vigilancia</div>
+        <h2>No pierdas la cosecha por enterarte tarde.</h2>
+        <p>Avisos de calor, helada y lluvia fuerte con la previsión de tu zona, y de las plagas que cuentan cerca los técnicos de la Junta. Te llegan con margen para proteger el cultivo.</p>
+        <div class="dato"><span>Calor <b>en floración</b></span><span>Jueves <b>41 °C</b></span></div>
+      </div>
+    </section>
+
+    <section class="paso" data-i="7">
+      <div class="pin">
+        <div class="cuando">Octubre · cosecha</div>
+        <h2>Al cosechar, el cuaderno ya está hecho.</h2>
+        <p>Abonados, riegos, tratamientos y ventas quedan apuntados a medida que los haces. El cuaderno sale en PDF con el modelo de la Junta, listo para tu gestoría, sin pasar nada a limpio.</p>
+        <ol class="cuaderno">
+          <li><time>14 abr</time><span>Siembra · 82.000 semillas/ha</span></li>
+          <li><time>14 abr</time><span>Abonado de fondo · dentro del plan de abonado</span></li>
+          <li><time>18 jun</time><span>Riego · 28 mm</span></li>
+          <li><time>23 jul</time><span>Tratamiento contra taladro</span></li>
+          <li><time>12 oct</time><span>Cosecha · 13.400 kg/ha</span></li>
+        </ol>
+      </div>
+    </section>
+
+    <section class="paso" data-i="8" id="comunidad">
+      <div class="pin">
+        <div class="cuando">Todo el año</div>
+        <h2>Surco lo hacemos con quien lo usa.</h2>
+        <p>Desde la app nos cuentas lo que echas en falta, y lo que más se pide es lo que llega antes.</p>
+        <div class="votos">
+          <div class="voto"><span>Precios de la lonja de tu zona</span><span class="n">412</span><span class="b"><i style="width:100%"></i></span></div>
+          <div class="voto"><span>Estaciones del tiempo fuera de Andalucía</span><span class="n">377</span><span class="b"><i style="width:91%"></i></span></div>
+          <div class="voto"><span>Mandar el cuaderno a la Junta desde Surco</span><span class="n">254</span><span class="b"><i style="width:62%"></i></span></div>
+        </div>
+        <span class="nota">Peticiones de ejemplo</span>
+      </div>
+    </section>
+  </div>
+</main>
+
+<section class="dentro" id="app">
+  <div class="cabeza">
+    <div class="cuando">La app por dentro</div>
+    <h2>Así se ve Surco con una parcela de verdad.</h2>
+    <p>Capturas de la aplicación tal cual, en el ordenador y en el móvil, con un olivar de regadío de Sevilla a finales de octubre.</p>
+  </div>
+  <div class="visor">
+    <div class="pestanas" role="tablist" aria-label="Pantallas de la aplicación">
+      <button class="pestana" role="tab" id="t-resumen" aria-controls="p-resumen" aria-selected="true"><strong>Resumen</strong><span>En una frase, cómo está la parcela: la fase del cultivo, la lluvia, el riego de los próximos días y lo que hay que mirar.</span></button>
+      <button class="pestana" role="tab" id="t-satelite" aria-controls="p-satelite" aria-selected="false" tabindex="-1"><strong>Satélite</strong><span>El vigor de cada parte de la parcela en la última imagen sin nubes, y qué parte está en cada tramo.</span></button>
+      <button class="pestana" role="tab" id="t-riego" aria-controls="p-riego" aria-selected="false" tabindex="-1"><strong>Agua y tiempo</strong><span>La estación más cercana de la Junta, la previsión de AEMET y lo que ha llovido, para decidir el riego.</span></button>
+      <button class="pestana" role="tab" id="t-plagas" aria-controls="p-plagas" aria-selected="false" tabindex="-1"><strong>Plagas</strong><span>Lo que han contado esta semana los técnicos de la Junta en sus parcelas de control cerca de la tuya.</span></button>
+      <button class="pestana" role="tab" id="t-cuaderno" aria-controls="p-cuaderno" aria-selected="false" tabindex="-1"><strong>Cuaderno</strong><span>Tratamientos con el producto del Registro oficial, y el plan de abonado con el nitrógeno que te queda.</span></button>
+    </div>
+    <div>
+      <figure class="marco" role="tabpanel" id="p-resumen" aria-labelledby="t-resumen"><div class="pantalla"><img src="/inicio/capturas/resumen.jpg" alt="Ficha de la parcela, pestaña Resumen, con la frase «Así está ahora», un aviso y la foto aérea, en el ordenador" loading="lazy"></div><div class="telefono"><img src="/inicio/capturas/resumen-movil.jpg" alt="Ficha de la parcela, pestaña Resumen, con la frase «Así está ahora», un aviso y la foto aérea, en el móvil" loading="lazy"></div><figcaption><span>Ficha de parcela · Resumen</span><span>Olivar de regadío · Sevilla</span></figcaption></figure>
+      <figure class="marco" role="tabpanel" id="p-satelite" aria-labelledby="t-satelite" hidden><div class="pantalla"><img src="/inicio/capturas/satelite.jpg" alt="Ficha de la parcela, pestaña Satélite, con el mapa de vigor (NDVI), en el ordenador" loading="lazy"></div><div class="telefono"><img src="/inicio/capturas/satelite-movil.jpg" alt="Ficha de la parcela, pestaña Satélite, con el mapa de vigor (NDVI), en el móvil" loading="lazy"></div><figcaption><span>Ficha de parcela · Satélite</span><span>Sentinel-2 · 10 m</span></figcaption></figure>
+      <figure class="marco" role="tabpanel" id="p-riego" aria-labelledby="t-riego" hidden><div class="pantalla"><img src="/inicio/capturas/riego.jpg" alt="Ficha de la parcela, pestaña Agua y tiempo, con la estación, la previsión y el tiempo, en el ordenador" loading="lazy"></div><div class="telefono"><img src="/inicio/capturas/riego-movil.jpg" alt="Ficha de la parcela, pestaña Agua y tiempo, con la estación, la previsión y el tiempo, en el móvil" loading="lazy"></div><figcaption><span>Ficha de parcela · Agua y tiempo</span><span>Estación a 10,7 km</span></figcaption></figure>
+      <figure class="marco" role="tabpanel" id="p-plagas" aria-labelledby="t-plagas" hidden><div class="pantalla"><img src="/inicio/capturas/plagas.jpg" alt="Ficha de la parcela, pestaña Plagas, con los conteos de repilo y mosca del olivo cerca, en el ordenador" loading="lazy"></div><div class="telefono"><img src="/inicio/capturas/plagas-movil.jpg" alt="Ficha de la parcela, pestaña Plagas, con los conteos de repilo y mosca del olivo cerca, en el móvil" loading="lazy"></div><figcaption><span>Ficha de parcela · Plagas</span><span>RAIF · Junta de Andalucía</span></figcaption></figure>
+      <figure class="marco" role="tabpanel" id="p-cuaderno" aria-labelledby="t-cuaderno" hidden><div class="pantalla"><img src="/inicio/capturas/cuaderno.jpg" alt="Ficha de la parcela, pestaña Cuaderno, con dos tratamientos y el plan de abonado, en el ordenador" loading="lazy"></div><div class="telefono"><img src="/inicio/capturas/cuaderno-movil.jpg" alt="Ficha de la parcela, pestaña Cuaderno, con dos tratamientos y el plan de abonado, en el móvil" loading="lazy"></div><figcaption><span>Ficha de parcela · Cuaderno</span><span>Modelo de la Junta · PDF</span></figcaption></figure>
+    </div>
+  </div>
+</section>
+
+<section class="cierre">
+  <div class="cuando">Empieza hoy</div>
+  <h2>Empieza por una parcela.</h2>
+  <p>Pones la referencia SIGPAC y en un minuto la tienes en el mapa. Lo demás lo vas viendo durante la campaña.</p>
+    <button class="btn me-interesa" type="button">Me interesa</button></section>
+
+<footer>
+    <span>Surco · <a href="/">Visor SIGPAC</a> · <a href="/aviso-legal/">Aviso legal</a></span>  <span>Datos: Copernicus Sentinel-2 · SIGPAC · IGN · SoilGrids</span>
+</footer>
+
+<p class="gracias" id="gracias" role="status" hidden>¡Gracias! Lo tenemos en cuenta: Surco abrirá pronto aquí, en surcoapp.es.</p>
+<script>
+// «Me interesa» (surcoapp.es, #175): solo cuenta el clic en GoatCounter, sin cookies ni datos de nadie, y da las gracias.
+document.querySelectorAll('.me-interesa').forEach((b) => b.addEventListener('click', () => {
+  try { window.goatcounter && window.goatcounter.count({ path: 'me-interesa', title: 'Me interesa', event: true }); } catch (e) {}
+  document.getElementById('gracias').hidden = false;
+}));
+</script>
+<script type="importmap">{ "imports": { "three": "/inicio/three/build/three.module.js", "three/addons/": "/inicio/three/examples/jsm/" } }</script>
+<script>
+// ---------- tema claro / oscuro ----------
+(() => {
+  const root = document.documentElement;
+  const dark = () => root.dataset.theme ? root.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+  document.getElementById('tema').addEventListener('click', () => {
+    const next = dark() ? 'light' : 'dark';
+    // La elección dura lo que la pestaña (sessionStorage); si queda igual que el del dispositivo, se olvida.
+    const sistema = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    if (next === sistema) delete root.dataset.theme; else root.dataset.theme = next;
+    try { if (next === sistema) sessionStorage.removeItem('surco-tema'); else sessionStorage.setItem('surco-tema', next); } catch (e) {}
+  });
+})();
+
+// ---------- pestañas de la app ----------
+(() => {
+  const tabs = [...document.querySelectorAll('.pestana')];
+  const sel = (tab, focus) => {
+    tabs.forEach((t) => {
+      const on = t === tab;
+      t.setAttribute('aria-selected', on); t.tabIndex = on ? 0 : -1;
+      document.getElementById(t.getAttribute('aria-controls')).hidden = !on;
+    });
+    if (focus) tab.focus();
+  };
+  tabs.forEach((t, i) => {
+    t.addEventListener('click', () => sel(t));
+    t.addEventListener('keydown', (e) => {
+      const d = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 }[e.key];
+      if (d) { e.preventDefault(); sel(tabs[(i + d + tabs.length) % tabs.length], true); }
+    });
+  });
+})();
+
+// si el 3D no arranca en unos segundos, aviso en lugar de un hueco vacío
+setTimeout(() => {
+  if (window.__surco3d || document.querySelector('.sin3d')) return;
+  const d = document.createElement('div'); d.className = 'sin3d';
+  d.textContent = 'Tu navegador no puede mostrar la parcela en 3D. El resto de la página funciona igual.';
+  document.querySelector('.lienzo').append(d);
+  document.documentElement.classList.add('sin-fijos');
+}, 9000);
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { Sky } from 'three/addons/objects/Sky.js';
+import { HDRLoader } from 'three/addons/loaders/HDRLoader.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+
+// ---------- escena 3D ----------
+(() => {
+  const sin3d = () => {
+    const d = document.createElement('div'); d.className = 'sin3d';
+    d.textContent = 'Tu navegador no puede mostrar la parcela en 3D. El resto de la página funciona igual.';
+    document.querySelector('.lienzo').append(d);
+    document.documentElement.classList.add('sin-fijos');
+  };
+
+  const W = 16, D = 12, T = 2.4;
+  const LAYERS = [
+    { top: 0, th: 0.8, tok: 'soil-ap', label: '0–30 cm · franco-arcilloso · M.O. 1,8 %', corto: '0–30 cm · franco-arcilloso' },
+    { top: 0.8, th: 0.9, tok: 'soil-bw', label: '30–70 cm · pH 7,9 · guarda 165 mm/m', corto: '30–70 cm · pH 7,9' },
+    { top: 1.7, th: 0.7, tok: 'soil-c', label: 'más de 70 cm · caliza', corto: '+70 cm · caliza' },
+  ];
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // utilidades
+  const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+  const sm = (x) => { x = clamp(x); return x * x * (3 - 2 * x); };
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const bump = (p, a, b, c, d) => p < a || p > d ? 0 : p < b ? sm((p - a) / (b - a)) : p <= c ? 1 : 1 - sm((p - c) / (d - c));
+  function hash(i, j) {
+    let h = (Math.imul(i | 0, 374761393) + Math.imul(j | 0, 668265263)) | 0;
+    h = Math.imul(h ^ (h >>> 13), 1274126177);
+    return ((h ^ (h >>> 16)) >>> 0) / 4294967295;
+  }
+  function vnoise(x, y) {
+    const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi;
+    const u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);
+    const a = hash(xi, yi), b = hash(xi + 1, yi), c = hash(xi, yi + 1), d = hash(xi + 1, yi + 1);
+    return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
+  }
+  const hex = (h) => { h = h.replace('#', ''); const n = parseInt(h, 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
+  const mix = (a, b, t) => [lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)];
+  const shade = (c, k) => [c[0] * k, c[1] * k, c[2] * k];
+  const toLin = (col, arr) => col.setRGB(arr[0] / 255, arr[1] / 255, arr[2] / 255).convertSRGBToLinear();
+  function ramp(stops) {
+    return (v) => {
+      if (v <= stops[0][0]) return stops[0][1];
+      for (let i = 1; i < stops.length; i++) if (v <= stops[i][0]) { const [a, ca] = stops[i - 1], [b, cb] = stops[i]; return mix(ca, cb, (v - a) / (b - a)); }
+      return stops[stops.length - 1][1];
+    };
+  }
+  // Las mismas escalas que la pestaña Satélite de la app
+  const NDVI_STOPS = [[0, [165, 0, 38]], [0.15, [215, 48, 39]], [0.25, [244, 109, 67]], [0.35, [253, 174, 97]], [0.45, [254, 224, 139]], [0.55, [217, 239, 139]], [0.65, [166, 217, 106]], [0.75, [102, 189, 99]], [0.85, [26, 152, 80]], [1, [0, 104, 55]]];
+  const NDMI_STOPS = [[-0.4, [140, 81, 10]], [-0.2, [216, 179, 101]], [0, [246, 232, 195]], [0.15, [171, 217, 233]], [0.3, [116, 173, 209]], [0.45, [49, 130, 189]], [0.6, [8, 69, 148]]];
+  const ndvi = ramp(NDVI_STOPS), ndmi = ramp(NDMI_STOPS);
+
+  // datos de la parcela (coordenadas de campo: x 0..W, y 0..D; y=0 es el fondo)
+  function vigorAt(x, y) {
+    let v = 0.64 + 0.42 * (vnoise(x * 0.26, y * 0.26) - 0.5) + 0.16 * (vnoise(x * 0.7 + 11, y * 0.7 + 3) - 0.5);
+    v -= 0.55 * Math.exp(-((x - 4) ** 2 + (y - 7.5) ** 2) / 7);
+    v -= 0.25 * Math.exp(-((x - 12) ** 2 + (y - 10) ** 2) / 4);
+    return clamp(v, 0.12, 0.96);
+  }
+  const GX = 32, GY = 24; // píxeles de satélite
+  const grid = [];
+  for (let j = 0; j < GY; j++) for (let i = 0; i < GX; i++) {
+    const x = (i + 0.5) * W / GX, y = (j + 0.5) * D / GY;
+    grid.push({ vig: vigorAt(x, y), moist: clamp(0.15 + 0.35 * vnoise(x * 0.3 + 70, y * 0.3) + 0.12 * (1 - x / W)) });
+  }
+  const plants = [];
+  for (let r = 0; r < 10; r++) for (let k = 0; k < 20; k++) {
+    const x = 0.4 + k * 0.8 + (hash(r, k) - 0.5) * 0.16, y = 0.6 + r * 1.2 + (hash(k, r + 3) - 0.5) * 0.08;
+    const v = vigorAt(x, y);
+    plants.push({ x, y, row: r, vn: clamp((v - 0.12) / 0.84), rot: hash(k, r + 9) * Math.PI, j: hash(k + 4, r) });
+  }
+  const NP = plants.length, NL = 9;
+  const X = (x) => x - W / 2, Z = (y) => y - D / 2;
+  // la planta de la esquina donde se ancla el aviso de calor, y lo que mide según lo que ha crecido
+  const pCalor = plants.reduce((m, p) => (Math.hypot(p.x - 1.2, p.y - 0.6) < Math.hypot(m.x - 1.2, m.y - 0.6) ? p : m));
+  const alturaPlanta = (p, g) => g * (0.9 + 0.2 * p.j) * (1.3 + 2.3 * p.vn);
+
+  // pasadas en serpentín: 2 pasadas de 5 líneas
+  const SEED = 4.4; // distancia del tractor a los cuerpos de siembra
+  function pass(t) {
+    if (t <= 0 || t >= 1) return null;
+    const a = -5, b = W + 8.5;
+    if (t < 0.48) return { dir: 1, x: a + (b - a) * (t / 0.48), y: 3.0 };
+    if (t > 0.52) return { dir: -1, x: W - a - (b - a) * ((t - 0.52) / 0.48), y: 9.0 };
+    return { dir: 1, x: b, y: 3.0, turning: true };
+  }
+  // Ritmo de cada pasada: entra y sale deprisa y va despacio mientras está sobre la parcela, para que
+  // la mayor parte del scroll de «siembra» y «cosecha» pille la máquina encima de la tierra.
+  const ritmo = (t) => {
+    const e = (u) => u + 0.6 * Math.sin(2 * Math.PI * u) / (2 * Math.PI);
+    if (t <= 0 || t >= 1) return t;
+    if (t < 0.48) return 0.48 * e(t / 0.48);
+    if (t > 0.52) return 0.52 + 0.48 * e((t - 0.52) / 0.48);
+    return t;
+  };
+  function done(x, row, t, reach) {
+    if (t >= 1) return true;
+    if (t <= 0) return false;
+    const ps = pass(t), first = row < 5;
+    if (t < 0.48) return first && x < ps.x - reach;
+    if (first) return true;
+    if (t <= 0.52) return false;
+    return x > ps.x + reach;
+  }
+
+  // tokens del tema
+  let tk = {}, isDark = false, themeV = 0;
+  function readTokens() {
+    const cs = getComputedStyle(document.documentElement);
+    ['bg', 'fg', 'maize', 'soil-ap', 'soil-bw', 'soil-c', 'soil-top', 'machine', 'alert', 'water', 'plant']
+      .forEach((n) => { tk[n] = cs.getPropertyValue('--' + n).trim() || '#888888'; });
+    isDark = hex(tk.bg)[0] < 80;
+    themeV++;
+  }
+  readTokens();
+
+  // renderer
+  const cv = document.getElementById('campo');
+  const lienzo = cv.parentElement;
+  let renderer;
+  try { renderer = new THREE.WebGLRenderer({ canvas: cv, antialias: true, alpha: true }); } catch (e) { sin3d(); return; }
+  window.__surco3d = true;
+  document.documentElement.classList.remove('sin-fijos'); document.querySelector('.sin3d')?.remove(); // si llegó tarde
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.toneMapping = THREE.NoToneMapping;
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFShadowMap;
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(28, 1, 0.5, 600);
+  let cw = 1, ch = 1, composer = null, gtao = null;
+  function resize() {
+    const r = lienzo.getBoundingClientRect();
+    cw = Math.max(1, r.width); ch = Math.max(1, r.height);
+    const pr = Math.min(1.75, window.devicePixelRatio || 1);
+    renderer.setPixelRatio(pr);
+    renderer.setSize(cw, ch, false);
+    if (composer) { composer.setPixelRatio(pr); composer.setSize(cw, ch); gtao.enabled = cw >= 560; }
+    camera.aspect = cw / ch; camera.updateProjectionMatrix();
+    document.querySelectorAll('.etq').forEach((e) => { e._w = 0; });
+  }
+  new ResizeObserver(resize).observe(lienzo);
+  resize();
+
+  // luces: cielo físico convertido en mapa de entorno (iluminación HDR) + sol con sombras
+  const SUN = new THREE.Vector3(9, 20, 5);
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  {
+    const sky = new Sky(); sky.scale.setScalar(1000);
+    const u = sky.material.uniforms;
+    u.turbidity.value = 5; u.rayleigh.value = 1.4; u.mieCoefficient.value = 0.004; u.mieDirectionalG.value = 0.8;
+    u.sunPosition.value.copy(SUN).normalize();
+    const skyScene = new THREE.Scene(); skyScene.add(sky);
+    scene.environment = pmrem.fromScene(skyScene, 0.02).texture;
+  }
+  // HDRI real (Poly Haven, CC0); mientras carga se usa el cielo calculado
+  fetch('/inicio/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr').then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(r.status))).then((buf) => {
+    const data = new HDRLoader().parse(buf);
+    const hdr = new THREE.DataTexture(data.data, data.width, data.height, THREE.RGBAFormat, data.type);
+    hdr.colorSpace = THREE.LinearSRGBColorSpace; hdr.mapping = THREE.EquirectangularReflectionMapping;
+    hdr.minFilter = hdr.magFilter = THREE.LinearFilter; hdr.flipY = true; hdr.needsUpdate = true;
+    scene.environment = pmrem.fromEquirectangular(hdr).texture;
+    hdr.dispose();
+  }).catch(() => { /* se queda el cielo calculado */ });
+  const hemi = new THREE.HemisphereLight(0xe4eef5, 0x5a4632, 0.5);
+  scene.add(hemi);
+  const sun = new THREE.DirectionalLight(0xfff0d8, 2.8);
+  sun.position.copy(SUN);
+  sun.castShadow = true;
+  const sombra = innerWidth <= 860 ? 1024 : 2048; sun.shadow.mapSize.set(sombra, sombra); // en el móvil, la mitad: se nota poco y pesa mucho
+  Object.assign(sun.shadow.camera, { left: -15, right: 15, top: 15, bottom: -15, near: 1, far: 60 });
+  sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.03;
+  scene.add(sun, sun.target);
+
+  const field = new THREE.Group();
+  scene.add(field);
+
+  // postprocesado: oclusión ambiental (GTAO) y salida en sRGB
+  composer = new EffectComposer(renderer);
+  composer.addPass(new RenderPass(scene, camera));
+  gtao = new GTAOPass(scene, camera, cw, ch);
+  gtao.updateGtaoMaterial({ radius: 0.55, distanceExponent: 1.5, thickness: 1.2, scale: 1.1, samples: 16 });
+  gtao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 6, rings: 2, samples: 16 });
+  gtao.blendIntensity = 0.85;
+  composer.addPass(gtao);
+  composer.addPass(new OutputPass());
+  resize();
+
+  // mapa de normales a partir de una altura en escala de grises
+  function normalFrom(hc, strength) {
+    const w = hc.width, h = hc.height, src = hc.getContext('2d').getImageData(0, 0, w, h).data;
+    const out = document.createElement('canvas'); out.width = w; out.height = h;
+    const og = out.getContext('2d'), id = og.createImageData(w, h);
+    const H = (x, y) => src[(((y + h) % h) * w + ((x + w) % w)) * 4] / 255;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      let nx = -(H(x + 1, y) - H(x - 1, y)) * strength, ny = (H(x, y + 1) - H(x, y - 1)) * strength, nz = 1;
+      const l = Math.hypot(nx, ny, nz); nx /= l; ny /= l; nz /= l;
+      const k = (y * w + x) * 4;
+      id.data[k] = (nx * 0.5 + 0.5) * 255; id.data[k + 1] = (ny * 0.5 + 0.5) * 255; id.data[k + 2] = (nz * 0.5 + 0.5) * 255; id.data[k + 3] = 255;
+    }
+    og.putImageData(id, 0, 0);
+    const t = new THREE.CanvasTexture(out); t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    return t;
+  }
+
+  // textura de grano para los cortes del suelo
+  function grainTexture() {
+    const c = document.createElement('canvas'); c.width = c.height = 256;
+    const g = c.getContext('2d');
+    const id = g.createImageData(256, 256);
+    for (let i = 0; i < 256 * 256; i++) {
+      const x = i % 256, y = (i / 256) | 0;
+      const n = 0.8 + 0.12 * vnoise(x / 9, y / 5) + 0.1 * Math.random();
+      id.data[i * 4] = id.data[i * 4 + 1] = id.data[i * 4 + 2] = Math.min(255, 255 * n); id.data[i * 4 + 3] = 255;
+    }
+    g.putImageData(id, 0, 0);
+    for (let i = 0; i < 160; i++) {
+      g.fillStyle = Math.random() < 0.6 ? `rgba(255,255,255,${0.2 + Math.random() * 0.3})` : `rgba(0,0,0,${0.15 + Math.random() * 0.2})`;
+      g.beginPath(); g.ellipse(Math.random() * 256, Math.random() * 256, 1 + Math.random() * 3, 1 + Math.random() * 2, Math.random() * 3, 0, 7); g.fill();
+    }
+    const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace;
+    return t;
+  }
+  const grain = grainTexture();
+  const grainNormal = normalFrom(grain.image, 3.5);
+
+  // capas de suelo
+  const layerMeshes = LAYERS.map((L) => {
+    const tex = grain.clone(); tex.needsUpdate = true; tex.repeat.set(4, L.th * 1.2);
+    const nrm = grainNormal.clone(); nrm.needsUpdate = true; nrm.repeat.copy(tex.repeat);
+    const m = new THREE.Mesh(new THREE.BoxGeometry(W, L.th, D), new THREE.MeshStandardMaterial({ map: tex, normalMap: nrm, normalScale: new THREE.Vector2(1.2, 1.2), roughness: 0.97 }));
+    m.castShadow = true; m.receiveShadow = true;
+    field.add(m);
+    return m;
+  });
+
+  // superficie: plano con caballones + textura que se pinta con los datos
+  const K = 40, STW = W * K, STH = D * K;
+  const surfCanvas = document.createElement('canvas'); surfCanvas.width = STW; surfCanvas.height = STH;
+  const sctx = surfCanvas.getContext('2d');
+  const dataCanvas = document.createElement('canvas'); dataCanvas.width = GX; dataCanvas.height = GY;
+  const dctx = dataCanvas.getContext('2d');
+  const dimg = dctx.createImageData(GX, GY);
+  // tierra real escaneada (Poly Haven, CC0): color, normales, rugosidad y desplazamiento
+  const texLoader = new THREE.TextureLoader();
+  const aniso = renderer.capabilities.getMaxAnisotropy();
+  const mud = (name, srgb) => {
+    const t = texLoader.load('/inicio/texturas/brown_mud_dry_' + name + '_1k.jpg');
+    t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(4, 3); t.anisotropy = aniso;
+    if (srgb) t.colorSpace = THREE.SRGBColorSpace;
+    return t;
+  };
+  const mudDiff = mud('diff', true), mudNor = mud('nor_gl'), mudRough = mud('rough'), mudDisp = mud('disp');
+  const surfTex = new THREE.CanvasTexture(surfCanvas);
+  surfTex.colorSpace = THREE.SRGBColorSpace;
+  surfTex.anisotropy = aniso;
+  const SEGX = 160, SEGY = 120;
+  const surfGeo = new THREE.PlaneGeometry(W, D, SEGX, SEGY);
+  surfGeo.rotateX(-Math.PI / 2);
+  const DISP = { displacementMap: mudDisp, displacementScale: 0.08, displacementBias: -0.03 };
+  const soilMat = new THREE.MeshStandardMaterial({ map: mudDiff, normalMap: mudNor, normalScale: new THREE.Vector2(1.2, 1.2), roughnessMap: mudRough, roughness: 1, ...DISP });
+  const surface = new THREE.Mesh(surfGeo, soilMat);
+  surface.position.y = 0.002; surface.receiveShadow = true;
+  // capa de datos encima, con la misma geometría y el mismo relieve
+  const surfMat = new THREE.MeshStandardMaterial({
+    map: surfTex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
+    normalMap: mudNor, roughness: 0.9, emissive: 0xffffff, emissiveMap: surfTex, emissiveIntensity: 0.1, ...DISP,
+  });
+  const overlay = new THREE.Mesh(surfGeo, surfMat);
+  overlay.position.y = 0.03; overlay.receiveShadow = true; // con 2 mm de separación la tierra asomaba a ratos
+  field.add(surface, overlay);
+  const sPos = surfGeo.attributes.position;
+
+  // El relieve de los surcos se calcula una vez (alturas y normales con todo sembrado); al pasar el
+  // tractor solo se cambian los vértices que acaban de sembrarse, sin rehacer las normales enteras.
+  const sNor = surfGeo.attributes.normal, NV = sPos.count;
+  const vx = new Float32Array(NV), vRow = new Uint8Array(NV), vY = new Float32Array(NV), vOn = new Uint8Array(NV);
+  const nFlat = Float32Array.from(sNor.array);
+  for (let i = 0; i < NV; i++) {
+    const x = sPos.getX(i) + W / 2, y = sPos.getZ(i) + D / 2;
+    vx[i] = x; vRow[i] = clamp(Math.round((y - 0.6) / 1.2), 0, 9);
+    vY[i] = x > 0.05 && x < W - 0.05 && y > 0.05 && y < D - 0.05 ? 0.09 * (0.5 + 0.5 * Math.cos(2 * Math.PI * (y - 0.6) / 1.2)) : 0;
+    sPos.setY(i, vY[i]);
+  }
+  surfGeo.computeVertexNormals();
+  const nRidge = Float32Array.from(sNor.array);
+  for (let i = 0; i < NV; i++) sPos.setY(i, 0);
+  sNor.array.set(nFlat);
+  function updateRidges(tractT) {
+    let cambia = false;
+    for (let i = 0; i < NV; i++) {
+      const on = tractT > 0 && vY[i] > 0 && done(vx[i], vRow[i], tractT, SEED) ? 1 : 0;
+      if (on === vOn[i]) continue;
+      vOn[i] = on; cambia = true;
+      sPos.setY(i, on ? vY[i] : 0);
+      const nn = on ? nRidge : nFlat;
+      sNor.setXYZ(i, nn[i * 3], nn[i * 3 + 1], nn[i * 3 + 2]);
+    }
+    if (cambia) { sPos.needsUpdate = true; sNor.needsUpdate = true; }
+  }
+
+  function clipHalf(kk) { // rectángulo ∩ {x + y <= kk}
+    const pts = [[0, 0], [W, 0], [W, D], [0, D]], out = [];
+    for (let i = 0; i < 4; i++) {
+      const a = pts[i], b = pts[(i + 1) % 4];
+      const ia = a[0] + a[1] <= kk, ib = b[0] + b[1] <= kk;
+      if (ia) out.push(a);
+      if (ia !== ib) { const t = (kk - a[0] - a[1]) / ((b[0] + b[1]) - (a[0] + a[1])); out.push([lerp(a[0], b[0], t), lerp(a[1], b[1], t)]); }
+    }
+    return out;
+  }
+  function paintSurface(st) {
+    const g = sctx;
+    g.globalAlpha = 1; g.clearRect(0, 0, STW, STH);
+    if (st.wet > 0) { g.fillStyle = `rgba(25,14,6,${0.4 * st.wet})`; g.fillRect(0, 0, STW, STH); }
+    if (st.ripe > 0) { g.fillStyle = `rgba(196,170,112,${0.32 * st.ripe})`; g.fillRect(0, 0, STW, STH); }
+    if (st.tractT > 0) { // fondo de los surcos
+      g.strokeStyle = 'rgba(20,10,4,0.3)'; g.lineWidth = 0.32 * K;
+      for (let r = 0; r <= 10; r++) {
+        const row = Math.min(r, 9), y = r * 1.2;
+        let x0 = 0, x1 = W;
+        const ps = pass(st.tractT);
+        if (ps) {
+          const impl = ps.x - SEED * ps.dir;
+          if (row < 5 && st.tractT < 0.48) x1 = clamp(impl, 0, W);
+          if (row >= 5) { if (st.tractT <= 0.52) continue; x0 = clamp(impl, 0, W); }
+        }
+        if (x1 <= x0) continue;
+        g.beginPath(); g.moveTo(x0 * K, y * K); g.lineTo(x1 * K, y * K); g.stroke();
+      }
+    }
+    if (st.mode && st.sweep > 0) {
+      for (let i = 0; i < grid.length; i++) {
+        const c = grid[i];
+        const col = st.mode === 'vigor' ? ndvi(0.08 + 0.88 * c.vig) : st.mode === 'agua' ? ndmi(-0.25 + 0.75 * c.moist + 0.25 * st.wet) : ndvi(0.2 + st.g * 0.72 * (0.35 + 0.65 * c.vig));
+        dimg.data[i * 4] = col[0]; dimg.data[i * 4 + 1] = col[1]; dimg.data[i * 4 + 2] = col[2]; dimg.data[i * 4 + 3] = 255;
+      }
+      dctx.putImageData(dimg, 0, 0);
+      const kk = st.sweep * (W + D), poly = clipHalf(kk);
+      if (poly.length > 2) {
+        g.save();
+        g.beginPath(); poly.forEach((p, i) => (i ? g.lineTo(p[0] * K, p[1] * K) : g.moveTo(p[0] * K, p[1] * K))); g.closePath(); g.clip();
+        g.imageSmoothingEnabled = false; g.globalAlpha = 0.95;
+        g.drawImage(dataCanvas, 0, 0, STW, STH);
+        g.globalAlpha = 0.18; g.strokeStyle = '#000'; g.lineWidth = 1; // rejilla de píxeles
+        for (let i = 1; i < GX; i++) { g.beginPath(); g.moveTo(i * STW / GX, 0); g.lineTo(i * STW / GX, STH); g.stroke(); }
+        for (let j = 1; j < GY; j++) { g.beginPath(); g.moveTo(0, j * STH / GY); g.lineTo(STW, j * STH / GY); g.stroke(); }
+        g.restore();
+      }
+      if (st.sweep > 0.02 && st.sweep < 1.1) {
+        const xa = Math.max(0, kk - D), xb = Math.min(W, kk);
+        if (xb > xa) {
+          g.save(); g.strokeStyle = '#fffbe8'; g.lineWidth = 0.14 * K; g.shadowColor = tk.maize; g.shadowBlur = 24;
+          g.beginPath(); g.moveTo(xa * K, (kk - xa) * K); g.lineTo(xb * K, (kk - xb) * K); g.stroke(); g.restore();
+        }
+      }
+    }
+    if (st.sigpac > 0.01) { // contorno del recinto
+      const e = 0.2, pts = [[e, e], [W - e, e], [W - e, D - e], [e, D - e], [e, e]];
+      const segs = pts.slice(1).map((p, i) => Math.hypot(p[0] - pts[i][0], p[1] - pts[i][1]));
+      let left = segs.reduce((a, b) => a + b, 0) * st.sigDraw;
+      g.save(); g.globalAlpha = st.sigpac; g.strokeStyle = tk.maize; g.lineWidth = 0.16 * K; g.setLineDash([0.5 * K, 0.3 * K]); g.lineCap = 'round';
+      g.beginPath(); g.moveTo(pts[0][0] * K, pts[0][1] * K);
+      for (let i = 0; i < segs.length && left > 0; i++) {
+        const f = Math.min(1, left / segs[i]); left -= segs[i];
+        g.lineTo(lerp(pts[i][0], pts[i + 1][0], f) * K, lerp(pts[i][1], pts[i + 1][1], f) * K);
+      }
+      g.stroke(); g.restore();
+    }
+    surfTex.needsUpdate = true;
+  }
+
+  // maíz con instancias
+  function leafGeometry() {
+    const n = 12, pos = [], idx = [], uv = [];
+    for (let i = 0; i <= n; i++) {
+      const t = i / n, y = 0.5 * Math.sin(t * Math.PI * 0.6) - 0.55 * t * t;
+      const w = 0.1 * Math.pow(Math.sin(Math.PI * Math.min(1, t * 0.98 + 0.02)), 0.6) + 0.008;
+      pos.push(t, y + 0.012, 0, t, y, -w / 2, t, y, w / 2);
+      uv.push(t, 0.5, t, 0, t, 1);
+      if (i < n) { const a = i * 3; idx.push(a, a + 3, a + 1, a + 1, a + 3, a + 4, a, a + 2, a + 3, a + 2, a + 5, a + 3); }
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    geo.setIndex(idx); geo.computeVertexNormals();
+    return geo;
+  }
+  const plantMat = new THREE.MeshStandardMaterial({ roughness: 0.62, metalness: 0, side: THREE.DoubleSide });
+  function leafTexture() {
+    const c = document.createElement('canvas'); c.width = 256; c.height = 64;
+    const g = c.getContext('2d');
+    const gr = g.createLinearGradient(0, 0, 0, 64);
+    gr.addColorStop(0, '#b9b9b9'); gr.addColorStop(0.42, '#f2f2f2'); gr.addColorStop(0.5, '#ffffff'); gr.addColorStop(0.58, '#f2f2f2'); gr.addColorStop(1, '#b9b9b9');
+    g.fillStyle = gr; g.fillRect(0, 0, 256, 64);
+    g.strokeStyle = 'rgba(255,255,240,0.9)'; g.lineWidth = 2.5; g.beginPath(); g.moveTo(0, 32); g.lineTo(256, 32); g.stroke();
+    g.strokeStyle = 'rgba(0,0,0,0.08)'; g.lineWidth = 1;
+    for (let v = 6; v < 64; v += 5) if (Math.abs(v - 32) > 3) { g.beginPath(); g.moveTo(0, v); g.lineTo(256, v); g.stroke(); }
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
+    return t;
+  }
+  const leafMat = new THREE.MeshStandardMaterial({ map: leafTexture(), roughness: 0.55, metalness: 0, side: THREE.DoubleSide });
+  const stalkGeo = new THREE.CylinderGeometry(0.03, 0.05, 1, 6); stalkGeo.translate(0, 0.5, 0);
+  const cobGeo = new THREE.CylinderGeometry(0.05, 0.07, 0.36, 8);
+  const tasselGeo = new THREE.ConeGeometry(0.08, 0.42, 5); tasselGeo.translate(0, 0.21, 0);
+  const stalks = new THREE.InstancedMesh(stalkGeo, plantMat, NP);
+  const leaves = new THREE.InstancedMesh(leafGeometry(), leafMat, NP * NL);
+  const cobs = new THREE.InstancedMesh(cobGeo, plantMat, NP);
+  const tassels = new THREE.InstancedMesh(tasselGeo, plantMat, NP);
+  [stalks, leaves, cobs, tassels].forEach((m) => {
+    m.castShadow = true; m.receiveShadow = true; m.frustumCulled = false; field.add(m);
+    for (let i = 0; i < m.count; i++) { m.setMatrixAt(i, new THREE.Matrix4().makeScale(0, 0, 0)); m.setColorAt(i, new THREE.Color(1, 1, 1)); }
+  });
+  const M = new THREE.Matrix4(), Q = new THREE.Quaternion(), E = new THREE.Euler(), PV = new THREE.Vector3(), SV = new THREE.Vector3(), COL = new THREE.Color();
+  const ZERO = new THREE.Matrix4().makeScale(0, 0, 0);
+  const STRAW = [196, 166, 104], STUB = [176, 150, 96];
+  function setI(mesh, i, x, y, z, rx, ry, rz, sx, sy, sz, rgb) {
+    PV.set(x, y, z); E.set(rx, ry, rz, 'YZX'); Q.setFromEuler(E); SV.set(sx, sy, sz);
+    M.compose(PV, Q, SV); mesh.setMatrixAt(i, M);
+    if (rgb) mesh.setColorAt(i, toLin(COL, rgb));
+  }
+  function hideI(mesh, i) { mesh.setMatrixAt(i, ZERO); }
+  // Mientras pasan las máquinas solo cambia cada planta al sembrarse o cortarse: se rehacen esas.
+  const pEstado = new Int8Array(NP).fill(-1);
+  let pBase = '';
+  function updatePlants(st, base) {
+    const green = hex(tk.plant), gold = hex(tk.maize), todas = base !== pBase;
+    pBase = base;
+    let cambia = false;
+    for (let i = 0; i < NP; i++) {
+      const p = plants[i], px = X(p.x), pz = Z(p.y);
+      const seeded = st.tractT > 0 && done(p.x, p.row, st.tractT, SEED);
+      const cut = st.combT > 0 && done(p.x, p.row, st.combT, -1.6);
+      const g = st.g * (0.9 + 0.2 * p.j);
+      const estado = !seeded || g < 0.015 ? 0 : cut ? 1 : 2;
+      if (!todas && estado === pEstado[i]) continue;
+      pEstado[i] = estado; cambia = true;
+      if (estado === 0) {
+        hideI(stalks, i); hideI(cobs, i); hideI(tassels, i);
+        for (let k = 0; k < NL; k++) hideI(leaves, i * NL + k);
+        continue;
+      }
+      if (estado === 1) {
+        setI(stalks, i, px, 0, pz, 0.15 * (p.j - 0.5), 0, 0.2 * (p.rot - 1.5), 1.3, 0.28, 1.3, STUB);
+        hideI(cobs, i); hideI(tassels, i);
+        for (let k = 0; k < NL; k++) hideI(leaves, i * NL + k);
+        continue;
+      }
+      const h = g * (1.3 + 2.3 * p.vn);
+      const base = mix(green, [190, 180, 80], (1 - p.vn) * 0.45);
+      const col = mix(base, STRAW, st.ripe);
+      setI(stalks, i, px, 0, pz, 0, 0, 0, 0.8 + 0.7 * Math.min(1, g * 1.4), h, 0.8 + 0.7 * Math.min(1, g * 1.4), shade(col, 0.9));
+      const n = Math.min(NL, 1 + Math.floor(g * 10));
+      for (let k = 0; k < NL; k++) {
+        if (k >= n) { hideI(leaves, i * NL + k); continue; }
+        const f = 0.06 + 0.84 * (k + 1) / (n + 1);
+        const ang = p.rot + (k % 2 ? Math.PI : 0) + (hash(i, k) - 0.5) * 0.6;
+        const L = (0.95 - 0.4 * f) * (0.45 + 0.55 * Math.min(1, g * 1.6)) * (0.8 + 0.4 * p.vn);
+        const pitch = (1 - Math.min(1, g * 1.5)) * 0.45 - 0.1 - 0.45 * st.ripe + (hash(k, i) - 0.5) * 0.2;
+        setI(leaves, i * NL + k, px, h * f, pz, 0, ang, pitch, L, L, L * 1.1, mix(col, shade(col, 0.82), k % 2));
+      }
+      if (g > 0.68) {
+        const s = sm((g - 0.68) / 0.2), a = p.rot + Math.PI / 2;
+        setI(cobs, i, px + Math.cos(a) * 0.08, h * 0.46, pz - Math.sin(a) * 0.08, 0, a, -0.35, s, s, s, mix(mix(base, [170, 185, 95], 0.4), [214, 190, 125], st.ripe));
+      } else hideI(cobs, i);
+      if (g > 0.8) {
+        const s = sm((g - 0.8) / 0.15);
+        setI(tassels, i, px, h, pz, 0, p.rot, 0, s, s, s, mix(gold, [190, 160, 100], st.ripe));
+      } else hideI(tassels, i);
+    }
+    if (cambia) [stalks, leaves, cobs, tassels].forEach((m) => { m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true; });
+  }
+
+  // piedras sueltas sobre la tierra
+  const NPEB = 450;
+  const pebbles = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 1), new THREE.MeshStandardMaterial({ roughness: 0.85, transparent: true }), NPEB);
+  pebbles.receiveShadow = true; pebbles.castShadow = false;
+  for (let i = 0; i < NPEB; i++) {
+    const sc = 0.02 + 0.05 * Math.pow(hash(i, 91), 2);
+    setI(pebbles, i, X(0.15 + hash(i, 92) * (W - 0.3)), sc * 0.3, Z(0.15 + hash(i, 93) * (D - 0.3)), hash(i, 94) * 3, hash(i, 95) * 6, 0, sc * 1.3, sc * 0.7, sc, mix([142, 124, 102], [92, 80, 66], hash(i, 96)));
+  }
+  field.add(pebbles);
+
+  // máquinas
+  function machineMats() {
+    return {
+      body: new THREE.MeshStandardMaterial({ color: tk.machine, roughness: 0.38, metalness: 0.25, transparent: true }),
+      dark: new THREE.MeshStandardMaterial({ color: 0x2a2d2a, roughness: 0.6, metalness: 0.3, transparent: true }),
+      rubber: new THREE.MeshStandardMaterial({ color: 0x161616, roughness: 0.95, transparent: true }),
+      rim: new THREE.MeshStandardMaterial({ color: tk.maize, roughness: 0.45, metalness: 0.3, transparent: true }),
+      glass: new THREE.MeshStandardMaterial({ color: 0xbcd6e6, roughness: 0.08, metalness: 0.4, transparent: true, opacity: 0.45 }),
+      steel: new THREE.MeshStandardMaterial({ color: 0x8d928d, roughness: 0.4, metalness: 0.7, transparent: true }),
+    };
+  }
+  function part(g, geo, mat, x, y, z, rot) {
+    const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z);
+    if (rot) m.rotation.set(rot[0], rot[1], rot[2]);
+    m.castShadow = true; m.receiveShadow = true; g.add(m); return m;
+  }
+  function wheel(g, mats, x, z, r, w, list) {
+    const holder = new THREE.Group(); holder.position.set(x, r, z); g.add(holder);
+    part(holder, new THREE.CylinderGeometry(r, r, w, 28), mats.rubber, 0, 0, 0, [Math.PI / 2, 0, 0]);
+    part(holder, new THREE.CylinderGeometry(r * 0.58, r * 0.58, w + 0.02, 18), mats.rim, 0, 0, 0, [Math.PI / 2, 0, 0]);
+    for (let k = 0; k < 4; k++) part(holder, new THREE.BoxGeometry(r * 1.9, 0.05, w + 0.03), mats.rubber, 0, 0, 0, [0, 0, k * Math.PI / 4]);
+    list.push({ holder, r });
+  }
+  const box = (a, b, c) => new THREE.BoxGeometry(a, b, c);
+  function makeTractor() {
+    const g = new THREE.Group(), mats = machineMats(), wheels = [];
+    part(g, box(2.6, 0.35, 0.62), mats.dark, 0.2, 0.55, 0);
+    part(g, box(1.9, 0.78, 0.82), mats.body, 0.55, 1.0, 0);
+    part(g, box(0.06, 0.62, 0.7), mats.dark, 1.52, 0.98, 0);
+    part(g, box(1.15, 0.28, 1.15), mats.body, -0.85, 1.02, 0);
+    part(g, box(1.02, 0.95, 1.02), mats.glass, -0.85, 1.64, 0);
+    [[-0.34, -0.5], [-0.34, 0.5], [-1.36, -0.5], [-1.36, 0.5]].forEach(([x, z]) => part(g, box(0.07, 0.95, 0.07), mats.dark, x, 1.64, z));
+    part(g, box(1.3, 0.1, 1.24), mats.body, -0.85, 2.15, 0);
+    part(g, new THREE.CylinderGeometry(0.045, 0.045, 0.8, 8), mats.dark, 0.95, 1.7, 0.28);
+    part(g, box(1.3, 0.08, 0.5), mats.body, -0.85, 1.5, 0.8);
+    part(g, box(1.3, 0.08, 0.5), mats.body, -0.85, 1.5, -0.8);
+    wheel(g, mats, -0.85, 0.8, 0.74, 0.44, wheels); wheel(g, mats, -0.85, -0.8, 0.74, 0.44, wheels);
+    wheel(g, mats, 1.1, 0.62, 0.43, 0.3, wheels); wheel(g, mats, 1.1, -0.62, 0.43, 0.3, wheels);
+    // sembradora de 5 líneas
+    part(g, box(0.9, 0.12, 0.12), mats.dark, -1.85, 0.62, 0);
+    part(g, box(0.26, 0.26, 6.1), mats.body, -2.45, 0.58, 0);
+    [-2.4, -1.2, 0, 1.2, 2.4].forEach((z) => {
+      part(g, box(0.5, 0.48, 0.46), mats.rim, -2.6, 1.0, z);
+      part(g, new THREE.CylinderGeometry(0.22, 0.22, 0.05, 16), mats.steel, -2.8, 0.22, z, [Math.PI / 2, 0, 0]);
+    });
+    return { g, mats, wheels };
+  }
+  function makeCombine() {
+    const g = new THREE.Group(), mats = machineMats(), wheels = [];
+    part(g, box(3.5, 1.5, 2.0), mats.body, -1.2, 1.45, 0);
+    part(g, box(1.05, 1.0, 1.15), mats.glass, -0.05, 2.7, 0);
+    part(g, box(1.25, 0.1, 1.35), mats.body, -0.05, 3.25, 0);
+    part(g, box(1.9, 0.8, 1.9), mats.body, -1.95, 2.6, 0);
+    part(g, new THREE.CylinderGeometry(0.12, 0.12, 3.0, 10), mats.dark, -2.3, 3.0, 1.05, [0, 0, Math.PI / 2 - 0.12]);
+    part(g, box(1.1, 0.5, 1.2), mats.dark, 0.75, 0.75, 0, [0, 0, -0.35]);
+    wheel(g, mats, -0.45, 1.18, 0.86, 0.5, wheels); wheel(g, mats, -0.45, -1.18, 0.86, 0.5, wheels);
+    wheel(g, mats, -2.55, 0.92, 0.5, 0.36, wheels); wheel(g, mats, -2.55, -0.92, 0.5, 0.36, wheels);
+    part(g, box(0.75, 0.45, 6.3), mats.rim, 1.45, 0.42, 0);
+    [-3.0, -1.8, -0.6, 0.6, 1.8, 3.0].forEach((z) => part(g, new THREE.ConeGeometry(0.2, 0.9, 4), mats.rim, 2.15, 0.32, z, [0, 0, -Math.PI / 2]));
+    return { g, mats, wheels };
+  }
+  const tractor = makeTractor(), combine = makeCombine();
+  field.add(tractor.g, combine.g);
+  // modelos detallados: sustituyen a las máquinas de bloques en cuanto cargan
+  const gltfLoader = new GLTFLoader().setDRACOLoader(new DRACOLoader().setDecoderPath('/inicio/three/examples/jsm/libs/draco/gltf/'));
+  function swapModel(mc, url) {
+    fetch(url).then((r) => r.ok ? r.arrayBuffer() : Promise.reject(r.status)).then((buf) => {
+      gltfLoader.parse(buf, '', (gl) => {
+        const mats = {};
+        gl.scene.traverse((o) => { if (o.isMesh) { o.castShadow = o.receiveShadow = true; o.material.transparent = true; mats[o.material.uuid] = o.material; } });
+        mc.g.clear(); mc.g.add(gl.scene);
+        mc.mats = mats; mc.wheels = []; mc.model = true;
+        // Se compilan ya sus materiales: si no, la primera vez que entra en la parcela da un tirón.
+        const vis = mc.g.visible; mc.g.visible = true; renderer.compile(scene, camera); mc.g.visible = vis;
+      }, () => {});
+    }).catch(() => {});
+  }
+  const PINTURA = 'verde'; // 'azul' para la versión azul (las dos sin logotipos)
+  swapModel(tractor, `/inicio/modelos/tractor_${PINTURA}.glb`); swapModel(combine, `/inicio/modelos/cosechadora_${PINTURA}.glb`);
+  function placeMachine(mc, ps, alpha) {
+    if (!ps || ps.turning || alpha <= 0.01) { mc.g.visible = false; return; }
+    mc.g.visible = true;
+    mc.g.position.set(X(ps.x), 0, Z(ps.y));
+    mc.g.rotation.y = ps.dir > 0 ? 0 : Math.PI;
+    mc.wheels.forEach((w) => { w.holder.rotation.z = -(ps.x * ps.dir) / w.r; });
+    Object.values(mc.mats).forEach((m) => {
+      // Siempre transparentes: cambiarlo al entrar o salir de la parcela recompila el material y da tirón.
+      if (!m.transparent) { m.transparent = true; m.needsUpdate = true; }
+      m.opacity = (m === mc.mats.glass ? 0.45 : 1) * alpha;
+    });
+  }
+  const edgeAlpha = (x) => 1 - sm((Math.max(-x, x - W) - 3.0) / 2.5);
+
+  // agua
+  const NDROP = 160;
+  const dropGeo = new THREE.BufferGeometry();
+  dropGeo.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(NDROP * 6), 3));
+  const dropMat = new THREE.LineBasicMaterial({ color: tk.water, transparent: true, opacity: 0 });
+  const drops = new THREE.LineSegments(dropGeo, dropMat); drops.frustumCulled = false; field.add(drops);
+  // frente de infiltración en las caras del corte: baja por donde ya ha pasado la capa de humedad
+  function fadeTexture() {
+    const c = document.createElement('canvas'); c.width = 4; c.height = 64;
+    const g = c.getContext('2d'), gr = g.createLinearGradient(0, 0, 0, 64);
+    gr.addColorStop(0, '#fff'); gr.addColorStop(0.7, '#bbb'); gr.addColorStop(1, '#111');
+    g.fillStyle = gr; g.fillRect(0, 0, 4, 64);
+    return new THREE.CanvasTexture(c);
+  }
+  const wetMat = new THREE.MeshBasicMaterial({ color: tk.water, transparent: true, opacity: 0, depthWrite: false, alphaMap: fadeTexture() });
+  const WSEG = 64, WMAX = 1.5;
+  function wetFace(len, fx, fy) { // fx, fy: coordenadas de campo del vértice según su x local
+    const geo = new THREE.PlaneGeometry(len, 1, WSEG, 1), m = new THREE.Mesh(geo, wetMat);
+    m.userData.cols = [];
+    for (let i = 0; i <= WSEG; i++) { const lx = geo.attributes.position.getX(i); m.userData.cols.push([fx(lx), fy(lx)]); }
+    field.add(m); return m;
+  }
+  const wetFront = wetFace(W, (lx) => lx + W / 2, () => D); wetFront.position.z = D / 2 + 0.01;
+  const wetSide = wetFace(D, () => W, (lx) => D / 2 - lx); wetSide.rotation.y = Math.PI / 2; wetSide.position.x = W / 2 + 0.01;
+  const wetDepth = (x, y, kk) => WMAX * sm((kk - x - y) / 5) * (0.8 + 0.4 * vnoise(x * 0.7 + 5, y * 0.7));
+  function updateWet(kk) {
+    [wetFront, wetSide].forEach((m) => {
+      const a = m.geometry.attributes.position;
+      m.userData.cols.forEach(([x, y], i) => { a.setY(i, -0.02); a.setY(i + WSEG + 1, -0.02 - wetDepth(x, y, kk)); });
+      a.needsUpdate = true;
+    });
+  }
+
+  // línea de guiado del tractor: la pasada actual y, discontinua, la siguiente
+  function dashTexture() {
+    const c = document.createElement('canvas'); c.width = 64; c.height = 4;
+    const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, 38, 4);
+    const t = new THREE.CanvasTexture(c); t.wrapS = THREE.RepeatWrapping; t.repeat.set(W / 0.9, 1);
+    return t;
+  }
+  const guideGeo = new THREE.PlaneGeometry(W, 0.1); guideGeo.rotateX(-Math.PI / 2);
+  const guideMat = new THREE.MeshBasicMaterial({ color: '#fff3c4', transparent: true, opacity: 0, depthWrite: false, toneMapped: false });
+  const guideNextMat = guideMat.clone(); guideNextMat.alphaMap = dashTexture();
+  const guide = new THREE.Mesh(guideGeo, guideMat), guideNext = new THREE.Mesh(guideGeo, guideNextMat);
+  const guideGlow = new THREE.Mesh(new THREE.PlaneGeometry(W, 0.34).rotateX(-Math.PI / 2), // sombra para que se lea sobre los mapas claros
+    new THREE.MeshBasicMaterial({ color: '#1a1208', transparent: true, opacity: 0, depthWrite: false, alphaMap: (() => {
+      const c = document.createElement('canvas'); c.width = 4; c.height = 32;
+      const g = c.getContext('2d'), gr = g.createLinearGradient(0, 0, 0, 32);
+      gr.addColorStop(0, '#000'); gr.addColorStop(0.5, '#fff'); gr.addColorStop(1, '#000'); g.fillStyle = gr; g.fillRect(0, 0, 4, 32);
+      return new THREE.CanvasTexture(c);
+    })() }));
+  [guideGlow, guide, guideNext].forEach((m, i) => { m.renderOrder = 2 + i; m.position.y = 0.13; field.add(m); });
+  function updateGuide(tractT) {
+    const a = sm(tractT / 0.04) * (1 - sm((tractT - 0.93) / 0.07));
+    const y = tractT < 0.5 ? 3.0 : 9.0;
+    guide.position.z = guideGlow.position.z = Z(y); guideNext.position.z = Z(9.0);
+    guideMat.opacity = 0.95 * a; guideGlow.material.opacity = 0.5 * a;
+    guideNextMat.opacity = 0.6 * a * (1 - sm((tractT - 0.42) / 0.08));
+    guide.visible = guideGlow.visible = a > 0.01; guideNext.visible = guideNextMat.opacity > 0.01;
+  }
+
+  // alertas
+  const alertSpots = [[11.3, 3.0], [13.6, 9.0], [8.2, 10.5]];
+  const ringMat = new THREE.MeshBasicMaterial({ color: tk.alert, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide });
+  const discMat = new THREE.MeshBasicMaterial({ color: tk.alert, transparent: true, opacity: 0, depthWrite: false });
+  const rings = alertSpots.map(([x, y]) => {
+    const r = new THREE.Mesh(new THREE.RingGeometry(0.85, 1.0, 48), ringMat.clone()); r.rotation.x = -Math.PI / 2; r.position.set(X(x), 0.12, Z(y));
+    const d = new THREE.Mesh(new THREE.CircleGeometry(0.75, 40), discMat); d.rotation.x = -Math.PI / 2; d.position.set(X(x), 0.11, Z(y));
+    field.add(r, d); return r;
+  });
+
+  // anillo de la zona que va por detrás
+  const zoneMat = new THREE.MeshBasicMaterial({ color: 0xfdae61, transparent: true, opacity: 0, depthTest: false, depthWrite: false, side: THREE.DoubleSide });
+  const zoneRing = new THREE.Mesh(new THREE.RingGeometry(2.05, 2.35, 72), zoneMat);
+  zoneRing.rotation.x = -Math.PI / 2; zoneRing.position.set(X(4), 0, Z(7.5)); zoneRing.renderOrder = 10;
+  const zoneFill = new THREE.Mesh(new THREE.CircleGeometry(2.1, 72), new THREE.MeshBasicMaterial({ color: 0xfdae61, transparent: true, opacity: 0, depthWrite: false }));
+  zoneFill.rotation.x = -Math.PI / 2; zoneFill.position.set(X(4), 0.13, Z(7.5));
+  field.add(zoneRing, zoneFill);
+
+  // sombra sobre la página
+  const shadowCatcher = new THREE.Mesh(new THREE.PlaneGeometry(120, 120), new THREE.ShadowMaterial({ opacity: 0.2 }));
+  shadowCatcher.rotation.x = -Math.PI / 2; shadowCatcher.receiveShadow = true; field.add(shadowCatcher);
+
+  // parcelas vecinas (vista final)
+  const neighbours = [];
+  for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) {
+    if (!a && !b) continue;
+    const w = W * (0.62 + 0.3 * hash(a + 5, b + 5)), d = D * (0.62 + 0.3 * hash(a + 7, b + 2));
+    const c = document.createElement('canvas'); c.width = 6; c.height = 4;
+    const g = c.getContext('2d');
+    for (let i = 0; i < 24; i++) { const col = ndvi(0.3 + 0.6 * hash(i, a * 3 + b + 20) * (0.6 + 0.4 * hash(a, b))); g.fillStyle = `rgb(${col.map((v) => v | 0)})`; g.fillRect(i % 6, (i / 6) | 0, 1, 1); }
+    const tex = new THREE.CanvasTexture(c); tex.magFilter = THREE.NearestFilter; tex.colorSpace = THREE.SRGBColorSpace;
+    const grp = new THREE.Group();
+    const sideMat = new THREE.MeshStandardMaterial({ color: tk['soil-ap'], roughness: 1, transparent: true, opacity: 0 });
+    const topMat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.9, emissive: 0xffffff, emissiveMap: tex, emissiveIntensity: 0.2, transparent: true, opacity: 0 });
+    const blk = new THREE.Mesh(box(w, T, d), sideMat); blk.position.y = -T / 2; blk.castShadow = true; blk.receiveShadow = true;
+    const top = new THREE.Mesh(new THREE.PlaneGeometry(w, d), topMat); top.rotation.x = -Math.PI / 2; top.position.y = 0.01;
+    grp.add(blk, top);
+    grp.position.set(a * (W + 3.5), 0, b * (D + 3.5));
+    field.add(grp);
+    neighbours.push({ grp, mats: [sideMat, topMat] });
+  }
+
+  function applyTheme() {
+    LAYERS.forEach((L, k) => layerMeshes[k].material.color.set(tk[L.tok]));
+    soilMat.color.set(isDark ? 0xa9a39b : 0xffffff);
+    [tractor, combine].forEach((mc) => { if (!mc.model) { mc.mats.body.color.set(tk.machine); mc.mats.rim.color.set(tk.maize); } });
+    dropMat.color.set(tk.water); wetMat.color.set(tk.water);
+    rings.forEach((r) => r.material.color.set(tk.alert)); discMat.color.set(tk.alert);
+    neighbours.forEach((n) => n.mats[0].color.set(tk['soil-ap']));
+    scene.background = new THREE.Color(tk.bg);
+    scene.environmentIntensity = isDark ? 0.32 : 0.55;
+    hemi.intensity = isDark ? 0.35 : 0.5;
+    hemi.color.set(isDark ? 0xc9d6e6 : 0xe4eef5);
+    sun.intensity = isDark ? 2.0 : 2.8;
+    sun.color.set(isDark ? 0xf3e6d2 : 0xfff0d8);
+    shadowCatcher.material.opacity = isDark ? 0.45 : 0.2;
+  }
+  applyTheme();
+  const onTheme = () => { readTokens(); applyTheme(); };
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', onTheme);
+  new MutationObserver(onTheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+  // etiquetas HTML
+  const capa = document.getElementById('etiquetas');
+  const V3 = new THREE.Vector3();
+  function mkTag(text, color, cls = '') {
+    const el = document.createElement('div'); el.className = 'etq';
+    el.innerHTML = `<i></i><span><b style="--c:${color || 'var(--maize)'}"></b></span>`;
+    el.querySelector('span').append(text);
+    el._izq = cls.includes('izq'); el._abajo = cls.includes('abajo'); el._w = 0;
+    capa.append(el); return el;
+  }
+  function setText(el, txt) {
+    const n = el.lastChild.lastChild;
+    if (n.textContent !== txt) { n.textContent = txt; el._w = 0; }
+  }
+  const short = () => cw < 520;
+  const tags = {
+    sigpac: mkTag('Recinto 12-145-3 · 4,62 ha · Maíz grano (PAC)', 'var(--maize)', 'izq abajo'),
+    capas: LAYERS.map((L) => mkTag(L.label, 'var(--' + L.tok + ')', 'izq')),
+    floja: mkTag('Zona floja · más abono', 'rgb(244,109,67)', 'izq abajo'), // debajo: arriba pasa el tractor
+    humedad: mkTag('Humedad a 40 cm · riego el jueves, 28 mm', 'var(--water)', 'izq'), // hacia dentro: a la derecha se sale en el móvil
+    atras: mkTag('Esta zona va 9 días por detrás', 'rgb(253,174,97)', 'izq abajo'),
+    taladro: mkTag('Calor en floración', 'var(--alert)'),
+    calor: mkTag('Jueves · 41 °C · golpe de calor', 'var(--maize)', 'izq'),
+    tuya: mkTag('Tu parcela', 'var(--maize)'),
+  };
+  // Cada etiqueta tiene un lado preferido; si no cabe en el lienzo, se va al contrario.
+  function showTag(el, x, y, z, a) {
+    if (a <= 0.01) { if (el.style.opacity !== '0') el.style.opacity = '0'; return; }
+    if (!el._w) { const sp = el.lastChild; el._w = sp.offsetWidth + 14; el._h = sp.offsetHeight + 24; }
+    V3.set(x, y, z); field.localToWorld(V3); V3.project(camera);
+    const sx = (V3.x + 1) / 2 * cw, sy = (1 - V3.y) / 2 * ch;
+    const fitsL = sx - el._w >= 0, fitsR = sx + el._w <= cw, fitsUp = sy - el._h >= 0, fitsDown = sy + el._h <= ch;
+    const izq = el._izq ? (fitsL || !fitsR) : (!fitsR && fitsL);
+    const abajo = el._abajo ? (fitsDown || !fitsUp) : (!fitsUp && fitsDown);
+    if (el.classList.contains('izq') !== izq) el.classList.toggle('izq', izq);
+    if (el.classList.contains('abajo') !== abajo) el.classList.toggle('abajo', abajo);
+    // Si no cabe hacia ningún lado (móvil estrecho), la caja se corre lo justo para no cortarse.
+    const corre = fitsL || fitsR ? 0 : izq ? Math.max(0, el._w - sx) : Math.min(0, cw - sx - el._w);
+    if (el._corre !== corre) { el.lastChild.style.translate = corre ? `${corre.toFixed(0)}px 0` : ''; el._corre = corre; }
+    el.style.transform = `translate(${sx.toFixed(1)}px, ${sy.toFixed(1)}px)`;
+    el.style.opacity = a.toFixed(2);
+  }
+
+  // ---------- estado según el scroll ----------
+  const pasos = [...document.querySelectorAll('.paso')];
+  const escenario = document.querySelector('.escenario');
+  const cabecera = document.querySelector('.cab');
+  // Altura a la que se queda quieto cada texto: justo bajo la barra en el móvil (la parcela va abajo); en escritorio,
+  // un poco por debajo de la cabecera.
+  const lineaTexto = () => innerWidth <= 860 ? cabecera.offsetHeight : cabecera.offsetHeight + innerHeight * 0.14;
+  function medidas() {
+    document.documentElement.style.setProperty('--cab-h', cabecera.offsetHeight + 'px');
+    document.documentElement.style.setProperty('--linea', lineaTexto() + 'px');
+    const col = document.querySelector('.paso').getBoundingClientRect(); // en el móvil .pasos no tiene caja
+    document.documentElement.style.setProperty('--col-x', col.left + 'px');
+    document.documentElement.style.setProperty('--col-w', Math.min(col.width, 544) + 'px');
+  }
+  medidas(); addEventListener('resize', medidas);
+  function scrollP() {
+    const vh = window.innerHeight;
+    const movil = innerWidth <= 860;
+    // Cuenta el principio de cada texto contra la línea donde se queda quieto: cada paso empieza
+    // al llegar a ella y la parcela sigue avanzando mientras el texto espera.
+    const ref = lineaTexto() + 1;
+    const cs = pasos.map((el, i) => { const r = el.getBoundingClientRect(); return i === 0 && !movil ? r.top + (ref - cabecera.offsetHeight) : r.top; });
+    if (ref <= cs[0]) return 0;
+    for (let i = 0; i < cs.length - 1; i++) if (ref < cs[i + 1]) return i + (ref - cs[i]) / (cs[i + 1] - cs[i]);
+    return Math.min(cs.length - 1 + 0.999, cs.length - 1 + (ref - cs[cs.length - 1]) / (vh * 0.6));
+  }
+  const MODES = { 3: 'vigor', 4: 'agua', 5: 'ndvi' };
+  function dataView(P, t) {
+    const st = Math.floor(P), u = P - st;
+    if (st === 0) {
+      const fade = 1 - sm((P - 0.5) / 0.4);
+      const k = reduce ? 0.75 : 0.5 + 0.5 * Math.sin(t * 0.55 - 1.4);
+      return { mode: 'vigor', sweep: (k * 1.3 - 0.12) * fade };
+    }
+    const m = MODES[st];
+    if (!m) return { mode: null, sweep: 0 };
+    const i = sm((u - 0.04) / 0.38), o = sm((u - 0.8) / 0.2);
+    return { mode: m, sweep: 1.15 * (i - o) };
+  }
+
+  const t0 = performance.now() / 1000;
+  let lastSurf = '', lastPlants = '', lastRidge = -1;
+  function render(P, t) {
+    const appear = reduce ? 1 : sm((t - t0) / 1.4);
+    const open = bump(P, 1.55, 2.0, 2.6, 2.95), sep = open * 0.95;
+    const dv = dataView(P, t);
+    const tractT = ritmo(clamp((P - 3.12) / 0.8)); // al pararse en «siembra», el tractor va por mitad de la parcela
+    const g = sm((P - 3.85) / 2.5);
+    const ripe = sm((P - 6.75) / 0.4);
+    const combT = ritmo(clamp((P - 7.15) / 0.55)); // igual que el tractor: a mitad de parcela al pararse en «cosecha»
+    const zoom = sm((P - 7.72) / 0.36);
+    const wet = bump(P, 3.9, 4.2, 4.7, 4.98);
+    const sigpac = bump(P, 0.55, 1.0, 1.55, 1.9);
+    const alerts = bump(P, 5.75, 6.05, 6.6, 6.9);
+    const behind = bump(P, 5.12, 5.4, 5.8, 5.97);
+
+    // cámara
+    const aspect = cw / ch, tv = Math.tan(THREE.MathUtils.degToRad(14));
+    let R = Math.max(10.6 / (tv * aspect), 9.2 / tv);
+    R *= lerp(1, 2.7, zoom);
+    const az = THREE.MathUtils.degToRad(40 + P * 3 + (reduce ? 0 : Math.sin(t * 0.18) * 1.2));
+    const el = THREE.MathUtils.degToRad(lerp(31, 50, zoom) - open * 7);
+    const ty = lerp(-0.2, -1.2, open) - (1 - appear) * 0;
+    camera.position.set(R * Math.cos(el) * Math.sin(az), ty + R * Math.sin(el), R * Math.cos(el) * Math.cos(az));
+    camera.lookAt(0, ty, 0);
+    field.position.y = (1 - appear) * 3;
+
+    // capas
+    LAYERS.forEach((L, k) => { layerMeshes[k].position.y = -(L.top + L.th / 2) - sep * k; });
+    shadowCatcher.position.y = -T - sep * 2 - 0.02;
+
+    // superficie
+    if (tractT !== lastRidge && (tractT < 1 || lastRidge < 1)) { updateRidges(tractT); lastRidge = tractT; }
+    const st = { mode: dv.mode, sweep: dv.sweep, wet, ripe, tractT, g, sigpac, sigDraw: sm((P - 0.55) / 0.55) };
+    const key = [st.mode, st.sweep.toFixed(3), wet.toFixed(2), ripe.toFixed(2), (Math.round(tractT * 400) / 400).toFixed(4), st.mode === 'ndvi' ? g.toFixed(3) : 0, sigpac.toFixed(2), st.sigDraw.toFixed(2), themeV].join('|');
+    if (key !== lastSurf) { paintSurface(st); lastSurf = key; }
+    surfMat.emissiveIntensity = 0.08 + 0.22 * clamp(dv.sweep);
+
+    // plantas
+    const pBaseKey = [g.toFixed(3), ripe.toFixed(2), themeV].join('|'), pk = [pBaseKey, tractT.toFixed(3), combT.toFixed(3)].join('|');
+    if (pk !== lastPlants) { updatePlants({ g, ripe, tractT, combT }, pBaseKey); lastPlants = pk; }
+
+    // máquinas
+    const tp = pass(tractT), cp = pass(combT);
+    placeMachine(tractor, tp, tp ? edgeAlpha(tp.x - 1.6 * tp.dir) : 0);
+    placeMachine(combine, cp, cp ? edgeAlpha(cp.x - 1.5 * cp.dir) : 0);
+
+    // agua
+    // el agua sigue a la capa de humedad: llueve y se infiltra solo donde ya ha pasado
+    const kk = dv.mode === 'agua' ? dv.sweep * (W + D) : 0;
+    dropMat.opacity = reduce ? 0 : 0.75 * wet;
+    if (wet > 0.01 && !reduce) {
+      const a = dropGeo.attributes.position;
+      for (let i = 0; i < NDROP; i++) {
+        const fx = hash(i, 1) * W, fy = hash(i, 2) * D, ph = (t * 0.9 + hash(i, 3)) % 1, y = fx + fy < kk ? 7 * (1 - ph) : -50;
+        a.setXYZ(i * 2, X(fx), y, Z(fy)); a.setXYZ(i * 2 + 1, X(fx), y + 0.4, Z(fy));
+      }
+      a.needsUpdate = true;
+    }
+    const md = wetDepth(W, D * 0.45, kk);
+    wetMat.opacity = 0.42 * clamp(wet * 3);
+    wetFront.visible = wetSide.visible = wet > 0.01 && kk > D;
+    if (wetFront.visible) updateWet(kk);
+    updateGuide(tractT);
+
+    // alertas
+    rings.forEach((r, i) => {
+      const ph = reduce ? 0.4 : (t * 0.7 + i * 0.33) % 1;
+      const s = 0.7 + 1.6 * ph; r.scale.set(s, s, s);
+      r.material.opacity = alerts * (1 - ph) * 0.9;
+      r.visible = alerts > 0.01;
+    });
+    discMat.opacity = alerts * 0.45;
+
+    // zona atrasada
+    zoneRing.visible = zoneFill.visible = behind > 0.01;
+    zoneRing.position.y = 0.15 + (1.3 + 2.3 * 0.25) * g;
+    const zp = reduce ? 1 : 1 + 0.04 * Math.sin(t * 3);
+    zoneRing.scale.set(zp, zp, zp);
+    zoneMat.opacity = 0.95 * behind;
+    zoneFill.material.opacity = 0.3 * behind;
+
+    // vecinas
+    neighbours.forEach((n) => { n.grp.visible = zoom > 0.01; n.mats.forEach((m) => { m.opacity = zoom; }); });
+
+    // etiquetas
+    setText(tags.sigpac, short() ? 'Recinto 12-145-3 · 4,62 ha' : 'Recinto 12-145-3 · 4,62 ha · Maíz grano (PAC)');
+    showTag(tags.sigpac, X(W - 0.2), 0.05, Z(D - 0.2), sigpac);
+    LAYERS.forEach((L, k) => {
+      setText(tags.capas[k], short() ? L.corto : L.label);
+      showTag(tags.capas[k], X(1.2 + (innerWidth <= 860 ? 4.6 * k : 0)), -(L.top + L.th / 2) - sep * k, D / 2, open); // en el móvil, escalonadas para que no se pisen
+    });
+    showTag(tags.floja, X(4), 0.1, Z(7.5), bump(P, 3.05, 3.2, 3.75, 3.95));
+    showTag(tags.humedad, W / 2, -md * 0.5, Z(D * 0.45), wet * sm(md / 0.4));
+    showTag(tags.atras, X(4) - 1.66, 0.15 + (1.3 + 2.3 * 0.25) * g, Z(7.5) + 1.66, behind);
+    showTag(tags.taladro, X(11.3), 3.2 * g, Z(3.0), alerts);
+    showTag(tags.calor, X(pCalor.x), alturaPlanta(pCalor, g), Z(pCalor.y), alerts); // en lo alto de una planta, no en el aire
+    showTag(tags.tuya, 0, 0.4, 0, sm((zoom - 0.5) / 0.4));
+
+    soilMat.roughness = 1 - 0.55 * wet;
+    const piedras = 1 - clamp(dv.sweep * 6);
+    pebbles.material.opacity = piedras; pebbles.visible = piedras > 0.01;
+    composer.render();
+    return dv;
+  }
+
+  // interfaz del escenario
+  const FASES = [
+    ['Febrero · alta de la parcela', 'antes de sembrar'], ['Febrero · alta de la parcela', 'SIGPAC + PAC'], ['Marzo · preparar el suelo', 'antes de sembrar'],
+    ['Abril · siembra', 'día 0'], ['Junio · riego', 'V6 · día 55'], ['Julio · crecimiento', 'VT · día 80'],
+    ['Julio–agosto · vigilancia', 'R1 · día 95'], ['Octubre · cosecha', 'R6 · día 180'], ['Después de cosechar', 'campaña cerrada'],
+  ];
+  const POS = [0, 0.03, 0.14, 0.27, 0.53, 0.68, 0.76, 0.98, 1];
+  const LEY = {
+    vigor: ['Vigor de campañas anteriores · NDVI', 'bajo', 'alto', NDVI_STOPS],
+    agua: ['Agua en la planta · NDMI', 'seca', 'húmeda', NDMI_STOPS],
+    ndvi: ['Vigor hoy · NDVI', 'bajo', 'alto', NDVI_STOPS],
+  };
+  const $ = (id) => document.getElementById(id);
+  let lastActive = -1, lastMode = null;
+  // Los textos van con el scroll real (sin suavizar): así nunca se quedan atrás ni repasan la
+  // historia entera al volver arriba de golpe. Solo se ve el del paso en curso; la portada y el
+  // último van en el flujo de la página y entran y salen con ella.
+  // Si se baja o se sube muy deprisa (volver arriba, un enlace, un tirón con el dedo) no se enseña
+  // ningún texto fijo hasta que se frena: si no, se verían pasar todos, uno encima de otro.
+  let lastVer = -1, pPrev = null, tPrev = 0, vel = 0;
+  function textos(P, t) {
+    if (pPrev !== null && t > tPrev) vel += (Math.abs(P - pPrev) / (t - tPrev) - vel) * 0.35; // pasos por segundo
+    pPrev = P; tPrev = t;
+    const a = clamp(Math.floor(P + 0.05), 0, pasos.length - 1), ver = vel > 4 ? -1 : a;
+    if (a === lastActive && ver === lastVer) return;
+    pasos.forEach((el, i) => {
+      el.classList.toggle('activo', i === a); el.classList.toggle('pasado', i < a);
+      el.firstElementChild.classList.toggle('ver', i === ver && i > 0);
+    });
+    lastActive = a; lastVer = ver;
+  }
+  let lastFase = -1;
+  function ui(P, dv) {
+    const a = clamp(Math.floor(P + 0.05), 0, pasos.length - 1);
+    if (a !== lastFase) { $('fase').textContent = FASES[a][0]; $('dia').textContent = FASES[a][1]; lastFase = a; }
+    const i = Math.floor(clamp(P, 0, 7.999)), f = lerp(POS[i], POS[i + 1], P - i);
+    $('relleno').style.width = (f * 100).toFixed(2) + '%';
+    $('punto').style.left = (f * 100).toFixed(2) + '%';
+    if (dv.mode && dv.mode !== lastMode) {
+      const L = LEY[dv.mode], lo = L[3][0][0], hi = L[3][L[3].length - 1][0];
+      $('leyendaTit').textContent = L[0]; $('leyendaMin').textContent = L[1]; $('leyendaMax').textContent = L[2];
+      $('leyendaRampa').style.background = `linear-gradient(90deg, ${L[3].map(([v, c]) => `rgb(${c}) ${(((v - lo) / (hi - lo)) * 100).toFixed(1)}%`).join(', ')})`;
+      lastMode = dv.mode;
+    }
+    $('leyenda').style.opacity = dv.mode ? clamp(dv.sweep * 2.5).toFixed(2) : 0;
+  }
+
+  // Tramos de P (el del scroll, sin el adelanto de render) en que cruza cada máquina, y lo que puede
+  // avanzar P por segundo en ellos: la pasada entera no baja de unos 2,2 s.
+  const MAQUINAS = [[3.12 - 0.35, 3.92 - 0.35, 0.8 / 2.2], [7.15 - 0.35, 7.7 - 0.35, 0.55 / 2.2]];
+  const maquina = (a, b) => MAQUINAS.find(([i, f]) => Math.max(a, b) > i && Math.min(a, b) < f);
+  const cruzaMaquina = (a, b) => !!maquina(a, b);
+  let Ps = scrollP(), onScreen = true, tFrame = null;
+  new IntersectionObserver(([e]) => { onScreen = e.isIntersecting; }).observe(escenario);
+  function frame(now) {
+    requestAnimationFrame(frame);
+    const t = now / 1000, target = scrollP();
+    textos(target, t);
+    if (!onScreen) return;
+    // La parcela sigue al scroll con un poco de inercia; en un salto grande (volver arriba, un enlace)
+    // se acerca de golpe para no repasar toda la campaña.
+    const d = target - Ps, dt = Math.min(0.1, t - (tFrame ?? t)); tFrame = t;
+    if (Math.abs(d) > 0.6 && (reduce || Math.abs(d) > 1.6 || !cruzaMaquina(Ps, target))) Ps = target - Math.sign(d) * 0.6;
+    let paso = (target - Ps) * (reduce ? 1 : 0.14);
+    // Mientras pasa el tractor o la cosechadora, la parcela no corre más que la máquina: aunque se baje
+    // de un tirón, la pasada dura lo suyo (los textos siguen al scroll real).
+    const m = !reduce && Math.abs(d) <= 1.6 && maquina(Ps, Ps + paso);
+    if (m) paso = clamp(paso, -m[2] * dt, m[2] * dt);
+    Ps += paso;
+    if (Math.abs(target - Ps) < 0.0005) Ps = target;
+    ui(Ps, render(Ps + 0.35, t));
+  }
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

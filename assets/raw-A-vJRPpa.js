@@ -1,0 +1,2 @@
+/*! Surco © 2026. Todos los derechos reservados. Prohibida su copia, modificación o ingeniería inversa sin permiso. */
+import{t as e}from"./basedecoder-BuG7fe0q.js";var t=class extends e{decodeBlock(e){return e}};export{t as default};
