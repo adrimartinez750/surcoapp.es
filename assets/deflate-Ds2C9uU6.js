@@ -1,0 +1,2 @@
+/*! Surco © 2026. Todos los derechos reservados. Prohibida su copia, modificación o ingeniería inversa sin permiso. */
+import{t as e}from"./pako.esm-BuOLpFkC.js";import{t}from"./basedecoder-BuG7fe0q.js";var n=class extends t{decodeBlock(t){return e(new Uint8Array(t)).buffer}};export{n as default};

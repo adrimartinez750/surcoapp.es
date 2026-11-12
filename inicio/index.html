@@ -102,6 +102,9 @@ a { color: inherit; }
 }
 .lienzo { position: relative; flex: 1; min-height: 0; }
 .lienzo canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+/* El dibujo fijo de la parcela mientras llega el 3D (y en su lugar con «reducir movimiento», #178) */
+.cartel { position: absolute; inset: 0; margin: auto; width: min(100%, 520px); height: 100%; pointer-events: none; transition: opacity .8s; }
+.con3d .cartel { opacity: 0; }
 .sin3d { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 24px; font-family: var(--f-mono); font-size: 13px; color: var(--muted); }
 .ficha { font-family: var(--f-mono); font-size: 12px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 6px 18px; letter-spacing: 0.02em; }
 .ficha b { color: var(--fg); font-weight: 500; }
@@ -319,6 +322,12 @@ button.me-interesa:disabled { cursor: default; opacity: .75; }
       <span>Superficie <b>4,62 ha</b></span>
     </div>
     <div class="lienzo">
+      <svg class="cartel" viewBox="0 0 400 260" aria-hidden="true">
+        <defs><linearGradient id="cartel-vigor" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#a6d96a"/><stop offset=".35" stop-color="#66bd63"/><stop offset=".55" stop-color="#d9ef8b"/><stop offset=".75" stop-color="#1a9850"/><stop offset="1" stop-color="#66bd63"/></linearGradient></defs>
+        <path d="M40 112 190 177v16L40 128z" fill="var(--soil-ap)"/><path d="M40 128 190 193v18L40 146z" fill="var(--soil-bw)"/><path d="M40 146 190 211v14L40 160z" fill="var(--soil-c)"/>
+        <path d="M190 177 360 106v16l-170 71z" fill="var(--soil-ap)" opacity=".85"/><path d="M190 193 360 122v18l-170 71z" fill="var(--soil-bw)" opacity=".85"/><path d="M190 211 360 140v14l-170 71z" fill="var(--soil-c)" opacity=".85"/>
+        <path d="M210 42 360 106 190 177 40 112z" fill="url(#cartel-vigor)" opacity=".9"/>
+      </svg>
       <canvas id="campo" role="img" aria-label="Parcela de maíz en 3D que se siembra, crece y se cosecha mientras bajas por la página"></canvas>
       <div class="etiquetas" id="etiquetas"></div>
       <div class="leyenda" id="leyenda" style="opacity:0">
@@ -512,9 +521,9 @@ document.querySelectorAll('.me-interesa').forEach((b) => b.addEventListener('cli
   });
 })();
 
-// si el 3D no arranca en unos segundos, aviso en lugar de un hueco vacío
+// si el navegador no llega ni a cargar el módulo del 3D (muy antiguo), aviso en lugar de un hueco vacío
 setTimeout(() => {
-  if (window.__surco3d || document.querySelector('.sin3d')) return;
+  if (window.__surco3dModulo || document.querySelector('.sin3d')) return;
   const d = document.createElement('div'); d.className = 'sin3d';
   d.textContent = 'Tu navegador no puede mostrar la parcela en 3D. El resto de la página funciona igual.';
   document.querySelector('.lienzo').append(d);
@@ -522,24 +531,54 @@ setTimeout(() => {
 }, 9000);
 </script>
 <script type="module">
-import * as THREE from 'three';
-import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
-import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
-import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
-import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { Sky } from 'three/addons/objects/Sky.js';
-import { HDRLoader } from 'three/addons/loaders/HDRLoader.js';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+window.__surco3dModulo = true;
+const sin3d = () => {
+  if (document.querySelector('.sin3d')) return;
+  const d = document.createElement('div'); d.className = 'sin3d';
+  d.textContent = 'Tu navegador no puede mostrar la parcela en 3D. El resto de la página funciona igual.';
+  document.querySelector('.lienzo').append(d);
+  document.documentElement.classList.add('sin-fijos');
+};
+
+// ---------- cuándo arranca el 3D ----------
+// Después del texto y sin estorbarlo (#178): Three.js, los modelos y las texturas pesan varios MB y
+// montar la escena ocupa el procesador. Mientras, se ve el dibujo fijo de la parcela (.cartel).
+// Arranca al primer toque, scroll, tecla o movimiento del ratón, o cuando la página lleva un rato
+// cargada y el navegador está libre; y solo si la parcela está a la vista o cerca. Con «reducir
+// movimiento», nada de 3D: el dibujo fijo y los textos uno detrás de otro.
+if (matchMedia('(prefers-reduced-motion: reduce)').matches) document.documentElement.classList.add('sin-fijos');
+else {
+  let quiere = false, cerca = false, empezado = false;
+  const intentar = () => {
+    if (empezado || !quiere || !cerca) return;
+    empezado = true;
+    QUIEN_DESPIERTA.forEach((ev) => removeEventListener(ev, despertar));
+    escena3d().catch(sin3d);
+  };
+  const despertar = () => { quiere = true; intentar(); };
+  const QUIEN_DESPIERTA = ['scroll', 'pointerdown', 'pointermove', 'touchstart', 'keydown', 'wheel'];
+  QUIEN_DESPIERTA.forEach((ev) => addEventListener(ev, despertar, { passive: true }));
+  const libre = (f) => ('requestIdleCallback' in window ? requestIdleCallback(f, { timeout: 2000 }) : setTimeout(f, 200));
+  const trasCargar = () => setTimeout(() => libre(despertar), 2500);
+  if (document.readyState === 'complete') trasCargar(); else addEventListener('load', trasCargar, { once: true });
+  new IntersectionObserver(([e]) => { cerca = e.isIntersecting; intentar(); }, { rootMargin: '50%' }).observe(document.querySelector('.lienzo'));
+}
 
 // ---------- escena 3D ----------
-(() => {
-  const sin3d = () => {
-    const d = document.createElement('div'); d.className = 'sin3d';
-    d.textContent = 'Tu navegador no puede mostrar la parcela en 3D. El resto de la página funciona igual.';
-    document.querySelector('.lienzo').append(d);
-    document.documentElement.classList.add('sin-fijos');
-  };
+async function escena3d() {
+  const [THREE, { EffectComposer }, { RenderPass }, { GTAOPass }, { OutputPass }, { Sky }, { HDRLoader }, { GLTFLoader }, { DRACOLoader }] = await Promise.all([
+    import('three'),
+    import('three/addons/postprocessing/EffectComposer.js'),
+    import('three/addons/postprocessing/RenderPass.js'),
+    import('three/addons/postprocessing/GTAOPass.js'),
+    import('three/addons/postprocessing/OutputPass.js'),
+    import('three/addons/objects/Sky.js'),
+    import('three/addons/loaders/HDRLoader.js'),
+    import('three/addons/loaders/GLTFLoader.js'),
+    import('three/addons/loaders/DRACOLoader.js'),
+  ]);
+  // En el móvil, menos: sin el cielo HDR (1,4 MB; se queda el calculado) y menos píxeles.
+  const movil = innerWidth <= 860;
 
   const W = 16, D = 12, T = 2.4;
   const LAYERS = [
@@ -547,7 +586,6 @@ import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
     { top: 0.8, th: 0.9, tok: 'soil-bw', label: '30–70 cm · pH 7,9 · guarda 165 mm/m', corto: '30–70 cm · pH 7,9' },
     { top: 1.7, th: 0.7, tok: 'soil-c', label: 'más de 70 cm · caliza', corto: '+70 cm · caliza' },
   ];
-  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   // utilidades
   const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
@@ -662,7 +700,7 @@ import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
   function resize() {
     const r = lienzo.getBoundingClientRect();
     cw = Math.max(1, r.width); ch = Math.max(1, r.height);
-    const pr = Math.min(1.75, window.devicePixelRatio || 1);
+    const pr = Math.min(movil ? 1.5 : 1.75, window.devicePixelRatio || 1);
     renderer.setPixelRatio(pr);
     renderer.setSize(cw, ch, false);
     if (composer) { composer.setPixelRatio(pr); composer.setSize(cw, ch); gtao.enabled = cw >= 560; }
@@ -684,7 +722,7 @@ import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
     scene.environment = pmrem.fromScene(skyScene, 0.02).texture;
   }
   // HDRI real (Poly Haven, CC0); mientras carga se usa el cielo calculado
-  fetch('/inicio/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr').then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(r.status))).then((buf) => {
+  if (!movil) fetch('/inicio/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr').then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(r.status))).then((buf) => {
     const data = new HDRLoader().parse(buf);
     const hdr = new THREE.DataTexture(data.data, data.width, data.height, THREE.RGBAFormat, data.type);
     hdr.colorSpace = THREE.LinearSRGBColorSpace; hdr.mapping = THREE.EquirectangularReflectionMapping;
@@ -697,7 +735,7 @@ import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
   const sun = new THREE.DirectionalLight(0xfff0d8, 2.8);
   sun.position.copy(SUN);
   sun.castShadow = true;
-  const sombra = innerWidth <= 860 ? 1024 : 2048; sun.shadow.mapSize.set(sombra, sombra); // en el móvil, la mitad: se nota poco y pesa mucho
+  const sombra = movil ? 1024 : 2048; sun.shadow.mapSize.set(sombra, sombra); // en el móvil, la mitad: se nota poco y pesa mucho
   Object.assign(sun.shadow.camera, { left: -15, right: 15, top: 15, bottom: -15, near: 1, far: 60 });
   sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.03;
   scene.add(sun, sun.target);
@@ -771,11 +809,11 @@ import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
   const dataCanvas = document.createElement('canvas'); dataCanvas.width = GX; dataCanvas.height = GY;
   const dctx = dataCanvas.getContext('2d');
   const dimg = dctx.createImageData(GX, GY);
-  // tierra real escaneada (Poly Haven, CC0): color, normales, rugosidad y desplazamiento
+  // tierra real escaneada (Poly Haven, CC0): color, normales, rugosidad y desplazamiento, a 512 px (se repite 4 × 3: no hace falta más)
   const texLoader = new THREE.TextureLoader();
   const aniso = renderer.capabilities.getMaxAnisotropy();
   const mud = (name, srgb) => {
-    const t = texLoader.load('/inicio/texturas/brown_mud_dry_' + name + '_1k.jpg');
+    const t = texLoader.load('/inicio/texturas/brown_mud_dry_' + name + '_512.jpg');
     t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(4, 3); t.anisotropy = aniso;
     if (srgb) t.colorSpace = THREE.SRGBColorSpace;
     return t;
@@ -1301,7 +1339,7 @@ import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
     const st = Math.floor(P), u = P - st;
     if (st === 0) {
       const fade = 1 - sm((P - 0.5) / 0.4);
-      const k = reduce ? 0.75 : 0.5 + 0.5 * Math.sin(t * 0.55 - 1.4);
+      const k = 0.5 + 0.5 * Math.sin(t * 0.55 - 1.4);
       return { mode: 'vigor', sweep: (k * 1.3 - 0.12) * fade };
     }
     const m = MODES[st];
@@ -1313,7 +1351,7 @@ import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
   const t0 = performance.now() / 1000;
   let lastSurf = '', lastPlants = '', lastRidge = -1;
   function render(P, t) {
-    const appear = reduce ? 1 : sm((t - t0) / 1.4);
+    const appear = sm((t - t0) / 1.4);
     const open = bump(P, 1.55, 2.0, 2.6, 2.95), sep = open * 0.95;
     const dv = dataView(P, t);
     const tractT = ritmo(clamp((P - 3.12) / 0.8)); // al pararse en «siembra», el tractor va por mitad de la parcela
@@ -1330,7 +1368,7 @@ import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
     const aspect = cw / ch, tv = Math.tan(THREE.MathUtils.degToRad(14));
     let R = Math.max(10.6 / (tv * aspect), 9.2 / tv);
     R *= lerp(1, 2.7, zoom);
-    const az = THREE.MathUtils.degToRad(40 + P * 3 + (reduce ? 0 : Math.sin(t * 0.18) * 1.2));
+    const az = THREE.MathUtils.degToRad(40 + P * 3 + Math.sin(t * 0.18) * 1.2);
     const el = THREE.MathUtils.degToRad(lerp(31, 50, zoom) - open * 7);
     const ty = lerp(-0.2, -1.2, open) - (1 - appear) * 0;
     camera.position.set(R * Math.cos(el) * Math.sin(az), ty + R * Math.sin(el), R * Math.cos(el) * Math.cos(az));
@@ -1360,8 +1398,8 @@ import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
     // agua
     // el agua sigue a la capa de humedad: llueve y se infiltra solo donde ya ha pasado
     const kk = dv.mode === 'agua' ? dv.sweep * (W + D) : 0;
-    dropMat.opacity = reduce ? 0 : 0.75 * wet;
-    if (wet > 0.01 && !reduce) {
+    dropMat.opacity = 0.75 * wet;
+    if (wet > 0.01) {
       const a = dropGeo.attributes.position;
       for (let i = 0; i < NDROP; i++) {
         const fx = hash(i, 1) * W, fy = hash(i, 2) * D, ph = (t * 0.9 + hash(i, 3)) % 1, y = fx + fy < kk ? 7 * (1 - ph) : -50;
@@ -1377,7 +1415,7 @@ import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 
     // alertas
     rings.forEach((r, i) => {
-      const ph = reduce ? 0.4 : (t * 0.7 + i * 0.33) % 1;
+      const ph = (t * 0.7 + i * 0.33) % 1;
       const s = 0.7 + 1.6 * ph; r.scale.set(s, s, s);
       r.material.opacity = alerts * (1 - ph) * 0.9;
       r.visible = alerts > 0.01;
@@ -1387,7 +1425,7 @@ import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
     // zona atrasada
     zoneRing.visible = zoneFill.visible = behind > 0.01;
     zoneRing.position.y = 0.15 + (1.3 + 2.3 * 0.25) * g;
-    const zp = reduce ? 1 : 1 + 0.04 * Math.sin(t * 3);
+    const zp = 1 + 0.04 * Math.sin(t * 3);
     zoneRing.scale.set(zp, zp, zp);
     zoneMat.opacity = 0.95 * behind;
     zoneFill.material.opacity = 0.3 * behind;
@@ -1478,18 +1516,24 @@ import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
     // La parcela sigue al scroll con un poco de inercia; en un salto grande (volver arriba, un enlace)
     // se acerca de golpe para no repasar toda la campaña.
     const d = target - Ps, dt = Math.min(0.1, t - (tFrame ?? t)); tFrame = t;
-    if (Math.abs(d) > 0.6 && (reduce || Math.abs(d) > 1.6 || !cruzaMaquina(Ps, target))) Ps = target - Math.sign(d) * 0.6;
-    let paso = (target - Ps) * (reduce ? 1 : 0.14);
+    if (Math.abs(d) > 0.6 && (Math.abs(d) > 1.6 || !cruzaMaquina(Ps, target))) Ps = target - Math.sign(d) * 0.6;
+    let paso = (target - Ps) * 0.14;
     // Mientras pasa el tractor o la cosechadora, la parcela no corre más que la máquina: aunque se baje
     // de un tirón, la pasada dura lo suyo (los textos siguen al scroll real).
-    const m = !reduce && Math.abs(d) <= 1.6 && maquina(Ps, Ps + paso);
+    const m = Math.abs(d) <= 1.6 && maquina(Ps, Ps + paso);
     if (m) paso = clamp(paso, -m[2] * dt, m[2] * dt);
     Ps += paso;
     if (Math.abs(target - Ps) < 0.0005) Ps = target;
+    // En el móvil, con el scroll quieto, lo que se mueve solo (el barrido del vigor, la lluvia, las
+    // alertas) va a unas 30 imágenes por segundo: no se nota y el teléfono va más suelto (#178).
+    if (movil && Ps === target && Ps === psPintado && now - tPintado < 33) return;
+    psPintado = Ps; tPintado = now;
     ui(Ps, render(Ps + 0.35, t));
+    if (!lienzo.classList.contains('con3d')) lienzo.classList.add('con3d'); // fuera el dibujo fijo
   }
+  let psPintado = null, tPintado = 0;
   requestAnimationFrame(frame);
-})();
+}
 </script>
 </body>
 </html>

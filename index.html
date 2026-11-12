@@ -35,17 +35,34 @@
       } catch (e) {}
     </script>
     <link rel="stylesheet" href="/fuentes/fuentes.css" />
-    <script type="module" crossorigin src="/assets/index-BDerLBp-.js"></script>
-    <link rel="modulepreload" crossorigin href="/assets/maplibre-C6WkC8Mu.js">
-    <link rel="stylesheet" crossorigin href="/assets/maplibre-DBE96hFo.css">
-    <link rel="stylesheet" crossorigin href="/assets/index-B_r5QxuT.css">
+    <!-- La letra de los títulos, pedida a la vez que el CSS y no después (#178). -->
+    <link rel="preload" href="/fuentes/archivo.woff2" as="font" type="font/woff2" crossorigin />
+    <script type="module" crossorigin src="/assets/index-BUTLcNXX.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-BhX1JXiH.css">
   <script data-goatcounter="https://surcoapp.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
 </head>
   <body>
-    <!-- Lo de dentro lo ve quien no ejecuta JavaScript (y los buscadores); React lo sustituye por el visor. -->
-    <div id="root">
-      <h1>Visor SIGPAC de toda España</h1>
-      <p>Gratis y sin cuenta. Datos del SIGPAC, Fondo Español de Garantía Agraria (FEGA).</p>
+    <!-- El marco del visor: el mapa y, en el móvil, una hoja debajo; en el ordenador, un lateral (como
+         «Añadir parcela»). La cabecera es HTML para que se vea enseguida (y la lea quien no ejecuta
+         JavaScript); src/visor/Visor.tsx pinta el mapa en #mapa y el resto del lateral en #lateral (#178).
+         La hoja tiene su alto desde el principio para que nada salte al llegar el resto. -->
+    <div id="root" class="grid h-dvh grid-rows-[minmax(0,1fr)_auto] bg-fondo text-texto lg:grid-cols-[minmax(0,1fr)_380px] lg:grid-rows-1">
+      <main id="mapa" class="relative min-h-0 bg-tarjeta"></main>
+      <aside
+        class="relative z-10 flex h-[48dvh] min-h-0 flex-col gap-4 overflow-y-auto rounded-t-2xl border-t border-linea bg-panel px-4 pt-3 pb-4 shadow-[0_-8px_24px_-12px_rgba(0,0,0,.4)] lg:h-auto lg:rounded-none lg:border-t-0 lg:border-l lg:p-6 lg:shadow-none"
+      >
+        <header>
+          <div class="flex items-center gap-2">
+            <img src="/icono.svg?v=2" alt="" width="32" height="32" class="h-8 w-8 shrink-0" />
+            <h1 class="font-display text-lg leading-tight font-bold tracking-tight lg:text-xl">Visor SIGPAC de toda España</h1>
+          </div>
+          <p class="mt-1 text-sm text-texto2">
+            Gratis y sin cuenta. Busca tu pueblo o la referencia de tu parcela y toca un recinto para ver su superficie, su uso, su
+            pendiente y su altura.
+          </p>
+        </header>
+        <div id="lateral" class="contents"></div>
+      </aside>
     </div>
     <!-- Debajo del mapa, para leer al bajar (y para los buscadores, que no ejecutan el mapa). Las marcas
          las rellena la compilación con lo de src/lib/visor/ (compilacion/textoDelVisor.ts). -->

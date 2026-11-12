@@ -1,0 +1,2 @@
+/*! Surco © 2026. Todos los derechos reservados. Prohibida su copia, modificación o ingeniería inversa sin permiso. */
+async function e(e,t){let n=await fetch(e,{signal:t});if(!n.ok)throw Error(String(n.status));return await n.json()}var t={teselas:e=>`${location.origin}/api/capas/${e}/{z}/{x}/{y}.png`,zonas:async(t,n,r)=>(await e(`/api/capas/zonas/${t}/${n}/${r}`)).features,rangoAltura:(t,n,r)=>e(`/api/capas/altura/rango?${new URLSearchParams({z:String(t),bbox:n.join(`,`)})}`,r)},n=()=>t;function r(e){t=e}export{r as n,n as t};
