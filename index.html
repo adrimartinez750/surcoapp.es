@@ -14,12 +14,21 @@
     <meta property="og:url" content="https://surcoapp.es/" />
     <meta property="og:title" content="Visor SIGPAC de toda España en tu móvil" />
     <meta property="og:description" content="Busca tu parcela por polígono y parcela y mira su superficie y su uso. Gratis y sin cuenta." />
-    <meta property="og:image" content="https://surcoapp.es/icono-512.png" />
-    <!-- Datos estructurados (WebApplication gratis y FAQPage), escritos al compilar: compilacion/textoDelVisor.ts -->
-    <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebApplication","name":"Visor SIGPAC de Surco","url":"https://surcoapp.es/","description":"Visor SIGPAC gratis y sin cuenta: busca tu parcela por provincia, municipio, polígono y parcela y mira en el mapa su superficie, su uso, su pendiente, el agua y el suelo, desde el móvil o el ordenador.","applicationCategory":"UtilitiesApplication","operatingSystem":"Cualquiera con navegador","inLanguage":"es","isAccessibleForFree":true,"offers":{"@type":"Offer","price":"0","priceCurrency":"EUR"}},{"@type":"FAQPage","mainEntity":[{"@type":"Question","name":"¿Es gratis el visor SIGPAC?","acceptedAnswer":{"@type":"Answer","text":"Sí. Es gratis, no pide cuenta ni datos y no guarda lo que buscas."}},{"@type":"Question","name":"¿Cómo busco mi parcela por polígono y parcela?","acceptedAnswer":{"@type":"Answer","text":"Escribe el código de la provincia (por ejemplo, 41 es Sevilla), el del municipio, el polígono y la parcela, y pulsa «Buscar». Si no pones recinto, salen todos los de la parcela. El agregado y la zona casi siempre son 0."}},{"@type":"Question","name":"¿Puedo buscar por referencia catastral?","acceptedAnswer":{"@type":"Answer","text":"Todavía no. Se busca con la referencia del SIGPAC (provincia, municipio, polígono, parcela y recinto) o por el nombre del pueblo, y luego tocas el recinto en el mapa."}},{"@type":"Question","name":"¿Qué capas se ven en el mapa?","acceptedAnswer":{"@type":"Answer","text":"La ortofoto del PNOA, los usos del SIGPAC, la altura, la pendiente, el agua subterránea (pozos y acuíferos), el suelo y las restricciones: zonas vulnerables a nitratos y Red Natura 2000."}},{"@type":"Question","name":"¿Funciona en el móvil?","acceptedAnswer":{"@type":"Answer","text":"Sí, en el navegador del móvil o del ordenador, sin instalar nada."}},{"@type":"Question","name":"¿Valen estos datos para la PAC?","acceptedAnswer":{"@type":"Answer","text":"Son los datos públicos del SIGPAC del FEGA tal como los da su servicio, pero solo informan: para la solicitud de la PAC y cualquier trámite valen los de la sede oficial de tu comunidad."}}]}]}</script>
-    <!-- Safari no usa el SVG en la pestaña: tira de los PNG. Chrome se queda con el SVG, que va el último. -->
-    <link rel="icon" type="image/png" sizes="32x32" href="/icono-32.png?v=2" />
+    <!-- Nombre del sitio, captura para compartir e iconos: los mismos que compilacion/cabeceraDelSitio.ts (#180). -->
+    <meta property="og:site_name" content="Surco" />
+    <meta property="og:image" content="https://surcoapp.es/imagen-compartir.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="El visor SIGPAC de Surco: recintos del SIGPAC sobre la ortofoto" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <!-- Datos estructurados (WebSite, WebApplication gratis y FAQPage), escritos al compilar: compilacion/textoDelVisor.ts -->
+    <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebSite","name":"Surco","alternateName":"Surco App","url":"https://surcoapp.es/","inLanguage":"es"},{"@type":"WebApplication","name":"Visor SIGPAC de Surco","url":"https://surcoapp.es/","description":"Visor SIGPAC gratis y sin cuenta: busca tu parcela por provincia, municipio, polígono y parcela y mira en el mapa su superficie, su uso, su pendiente, el agua y el suelo, desde el móvil o el ordenador.","image":"https://surcoapp.es/imagen-compartir.jpg","applicationCategory":"UtilitiesApplication","operatingSystem":"Cualquiera con navegador","inLanguage":"es","isAccessibleForFree":true,"offers":{"@type":"Offer","price":"0","priceCurrency":"EUR"}},{"@type":"FAQPage","mainEntity":[{"@type":"Question","name":"¿Es gratis el visor SIGPAC?","acceptedAnswer":{"@type":"Answer","text":"Sí. Es gratis, no pide cuenta ni datos y no guarda lo que buscas."}},{"@type":"Question","name":"¿Cómo busco mi parcela por polígono y parcela?","acceptedAnswer":{"@type":"Answer","text":"Escribe el código de la provincia (por ejemplo, 41 es Sevilla), el del municipio, el polígono y la parcela, y pulsa «Buscar». Si no pones recinto, salen todos los de la parcela. El agregado y la zona casi siempre son 0."}},{"@type":"Question","name":"¿Puedo buscar por referencia catastral?","acceptedAnswer":{"@type":"Answer","text":"Todavía no. Se busca con la referencia del SIGPAC (provincia, municipio, polígono, parcela y recinto) o por el nombre del pueblo, y luego tocas el recinto en el mapa."}},{"@type":"Question","name":"¿Qué capas se ven en el mapa?","acceptedAnswer":{"@type":"Answer","text":"La ortofoto del PNOA, los usos del SIGPAC, la altura, la pendiente, el agua subterránea (pozos y acuíferos), el suelo y las restricciones: zonas vulnerables a nitratos y Red Natura 2000."}},{"@type":"Question","name":"¿Funciona en el móvil?","acceptedAnswer":{"@type":"Answer","text":"Sí, en el navegador del móvil o del ordenador, sin instalar nada."}},{"@type":"Question","name":"¿Valen estos datos para la PAC?","acceptedAnswer":{"@type":"Answer","text":"Son los datos públicos del SIGPAC del FEGA tal como los da su servicio, pero solo informan: para la solicitud de la PAC y cualquier trámite valen los de la sede oficial de tu comunidad."}}]}]}</script>
+    <!-- Safari no usa el SVG en la pestaña: tira de los PNG. Google, del de 48 o el de 192 (y de /favicon.ico).
+         Chrome se queda con el SVG, que va el último. -->
     <link rel="icon" type="image/png" sizes="16x16" href="/icono-16.png?v=2" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/icono-32.png?v=2" />
+    <link rel="icon" type="image/png" sizes="48x48" href="/icono-48.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icono-192.png" />
     <link rel="icon" type="image/svg+xml" href="/icono.svg?v=2" />
     <link rel="apple-touch-icon" href="/icono-apple.png?v=2" />
     <meta name="theme-color" content="#3B6D11" />
@@ -35,10 +44,12 @@
       } catch (e) {}
     </script>
     <link rel="stylesheet" href="/fuentes/fuentes.css" />
+    <!-- Con «Sobre el visor» plegado, la página es solo el mapa: no baja ni asoma nada debajo (#183). -->
+    <style>html:has(#sobre-el-visor:not([open])){overflow:hidden}html:has(#sobre-el-visor:not([open])) body{overflow:hidden}</style>
     <!-- La letra de los títulos, pedida a la vez que el CSS y no después (#178). -->
     <link rel="preload" href="/fuentes/archivo.woff2" as="font" type="font/woff2" crossorigin />
-    <script type="module" crossorigin src="/assets/index-9LQDZ3dX.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-DsDo5b8u.css">
+    <script type="module" crossorigin src="/assets/index-D-y943eI.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-BRfq6_7t.css">
   <script data-goatcounter="https://surcoapp.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
 </head>
   <body>
@@ -71,10 +82,13 @@
         <div id="lateral" class="contents"></div>
       </aside>
     </div>
-    <!-- Debajo del mapa, para leer al bajar (y para los buscadores, que no ejecutan el mapa). Las marcas
+    <!-- Para los buscadores (que no ejecutan el mapa) y para quien lo pida con el enlace del lateral: plegado
+         (#183). Mientras está cerrado la página no baja (el :has de abajo), así que no asoma bajo el mapa;
+         src/visor/sobreElVisor.ts lo abre al pulsar el enlace y lo cierra al volver al mapa. Las marcas
          las rellena la compilación con lo de src/lib/visor/ (compilacion/textoDelVisor.ts). -->
-    <section id="sobre-el-visor" class="border-t border-linea bg-fondo text-texto">
-      <div class="mx-auto max-w-3xl px-4 pt-8 pb-12 leading-relaxed">
+    <details id="sobre-el-visor" class="border-t border-linea bg-fondo text-texto">
+      <summary class="mx-auto max-w-3xl cursor-pointer px-4 py-4 font-display font-bold">Sobre el visor y preguntas frecuentes</summary>
+      <div class="mx-auto max-w-3xl px-4 pt-4 pb-12 leading-relaxed">
         <h2 class="font-display text-2xl font-bold tracking-tight">Visor SIGPAC: tu parcela en el mapa</h2>
         <p class="mt-2">Busca tu parcela por provincia, municipio, polígono y parcela, o por el nombre del pueblo, y al tocar un recinto ves su superficie, su uso del SIGPAC y su pendiente. Tiene la ortofoto del PNOA y las capas de altura, pendiente, agua subterránea (pozos y acuíferos), suelo y restricciones (zonas vulnerables a nitratos y Red Natura 2000). Gratis y sin cuenta, en el móvil o el ordenador.</p>
         <p class="mt-2 text-texto2">
@@ -126,6 +140,6 @@
           <a href="/aviso-legal/" class="underline">Aviso legal</a>
         </p>
       </div>
-    </section>
+    </details>
   </body>
 </html>
