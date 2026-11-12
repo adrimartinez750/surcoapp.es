@@ -1297,6 +1297,7 @@ async function escena3d() {
   }
 
   await ceder();
+  let brilloCapa = 1; // cuánto brilla por sí sola la capa de colores (menos en claro, applyTheme)
   function applyTheme() {
     LAYERS.forEach((L, k) => layerMeshes[k].material.color.set(tk[L.tok]));
     soilMat.color.set(isDark ? 0xa9a39b : 0xffffff);
@@ -1309,6 +1310,8 @@ async function escena3d() {
     hemi.intensity = isDark ? 0.35 : 0.5;
     hemi.color.set(isDark ? 0xc9d6e6 : 0xe4eef5);
     sun.intensity = isDark ? 2.0 : 2.8;
+    // La capa de colores, más apagada en claro: con toda la luz los amarillos del vigor salían casi blancos.
+    surfMat.color.set(isDark ? 0xffffff : 0xd0d0d0); brilloCapa = isDark ? 1 : 0.5;
     sun.color.set(isDark ? 0xf3e6d2 : 0xfff0d8);
     shadowCatcher.material.opacity = isDark ? 0.45 : 0.2;
   }
@@ -1424,7 +1427,7 @@ async function escena3d() {
     const st = { mode: dv.mode, sweep: dv.sweep, wet, ripe, tractT, g, sigpac, sigDraw: sm((P - 0.55) / 0.55) };
     const key = [st.mode, st.sweep.toFixed(3), wet.toFixed(2), ripe.toFixed(2), (Math.round(tractT * 400) / 400).toFixed(4), st.mode === 'ndvi' ? g.toFixed(3) : 0, sigpac.toFixed(2), st.sigDraw.toFixed(2), themeV].join('|');
     if (key !== lastSurf) { paintSurface(st); lastSurf = key; }
-    surfMat.emissiveIntensity = 0.08 + 0.22 * clamp(dv.sweep);
+    surfMat.emissiveIntensity = (0.08 + 0.22 * clamp(dv.sweep)) * brilloCapa;
 
     // plantas
     const pBaseKey = [g.toFixed(3), ripe.toFixed(2), themeV].join('|'), pk = [pBaseKey, tractT.toFixed(3), combT.toFixed(3)].join('|');
