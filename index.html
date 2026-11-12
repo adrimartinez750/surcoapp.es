@@ -37,19 +37,26 @@
     <link rel="stylesheet" href="/fuentes/fuentes.css" />
     <!-- La letra de los títulos, pedida a la vez que el CSS y no después (#178). -->
     <link rel="preload" href="/fuentes/archivo.woff2" as="font" type="font/woff2" crossorigin />
-    <script type="module" crossorigin src="/assets/index-BUTLcNXX.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-BhX1JXiH.css">
+    <script type="module" crossorigin src="/assets/index-9LQDZ3dX.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-DsDo5b8u.css">
   <script data-goatcounter="https://surcoapp.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
 </head>
   <body>
     <!-- El marco del visor: el mapa y, en el móvil, una hoja debajo; en el ordenador, un lateral (como
          «Añadir parcela»). La cabecera es HTML para que se vea enseguida (y la lea quien no ejecuta
          JavaScript); src/visor/Visor.tsx pinta el mapa en #mapa y el resto del lateral en #lateral (#178).
-         La hoja tiene su alto desde el principio para que nada salte al llegar el resto. -->
-    <div id="root" class="grid h-dvh grid-rows-[minmax(0,1fr)_auto] bg-fondo text-texto lg:grid-cols-[minmax(0,1fr)_380px] lg:grid-rows-1">
+         La hoja tiene su alto desde el principio para que nada salte al llegar el resto. El panel se mete
+         con el botón del borde del mapa (src/visor/BotonPanel.tsx, #182): con data-panel="oculto", su
+         columna (su fila en el móvil) pasa a 0 con una transición y el panel, con su ancho o alto fijo, se
+         va por el borde (overflow-hidden) mientras el mapa ocupa el sitio. -->
+    <div
+      id="root"
+      class="grid h-dvh grid-rows-[minmax(0,1fr)_48dvh] overflow-hidden bg-fondo text-texto transition-[grid-template-columns,grid-template-rows] duration-300 ease-out motion-reduce:transition-none data-[panel=oculto]:grid-rows-[minmax(0,1fr)_0dvh] lg:grid-cols-[minmax(0,1fr)_380px] lg:grid-rows-1 lg:data-[panel=oculto]:grid-cols-[minmax(0,1fr)_0px] lg:data-[panel=oculto]:grid-rows-1"
+    >
       <main id="mapa" class="relative min-h-0 bg-tarjeta"></main>
       <aside
-        class="relative z-10 flex h-[48dvh] min-h-0 flex-col gap-4 overflow-y-auto rounded-t-2xl border-t border-linea bg-panel px-4 pt-3 pb-4 shadow-[0_-8px_24px_-12px_rgba(0,0,0,.4)] lg:h-auto lg:rounded-none lg:border-t-0 lg:border-l lg:p-6 lg:shadow-none"
+        id="panel"
+        class="relative z-10 flex h-[48dvh] min-h-0 flex-col gap-4 overflow-y-auto rounded-t-2xl border-t border-linea bg-panel px-4 pt-6 pb-4 shadow-[0_-8px_24px_-12px_rgba(0,0,0,.4)] lg:h-auto lg:w-[380px] lg:rounded-none lg:border-t-0 lg:border-l lg:p-6 lg:shadow-none"
       >
         <header>
           <div class="flex items-center gap-2">

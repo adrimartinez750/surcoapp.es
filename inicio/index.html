@@ -101,10 +101,12 @@ a { color: inherit; }
   display: flex; flex-direction: column; padding-block: 20px;
 }
 .lienzo { position: relative; flex: 1; min-height: 0; }
-.lienzo canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
-/* El dibujo fijo de la parcela mientras llega el 3D (y en su lugar con «reducir movimiento», #178) */
-.cartel { position: absolute; inset: 0; margin: auto; width: min(100%, 520px); height: 100%; pointer-events: none; transition: opacity .8s; }
-.con3d .cartel { opacity: 0; }
+.lienzo canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; opacity: 0; transition: opacity .45s ease; }
+.lienzo.con3d canvas { opacity: 1; }
+/* Mientras llega el 3D (y en su lugar con «reducir movimiento»), una captura de su primer fotograma en
+   el mismo sitio y con el mismo encuadre: el 3D se funde encima y el paso no se nota (#178). La saca
+   compilacion/cartelPortada.ts; el 3D encaja la parcela igual que «contain» con su proporción. */
+.cartel, .cartel img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; display: block; pointer-events: none; }
 .sin3d { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 24px; font-family: var(--f-mono); font-size: 13px; color: var(--muted); }
 .ficha { font-family: var(--f-mono); font-size: 12px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 6px 18px; letter-spacing: 0.02em; }
 .ficha b { color: var(--fg); font-weight: 500; }
@@ -271,7 +273,7 @@ footer { border-top: 1px solid var(--line); padding-block: 24px 36px; font-famil
 .sin-fijos .pin { position: static; width: auto; opacity: 1; visibility: visible; transform: none; }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
-  .paso, .pin, .cuaderno li, .leyenda, body { transition: none; }
+  .paso, .pin, .cuaderno li, .leyenda, body, .lienzo canvas { transition: none; }
 }
 </style>
 <style>
@@ -322,15 +324,15 @@ button.me-interesa:disabled { cursor: default; opacity: .75; }
       <span>Superficie <b>4,62 ha</b></span>
     </div>
     <div class="lienzo">
-      <svg class="cartel" viewBox="0 0 400 260" aria-hidden="true">
-        <defs><linearGradient id="cartel-vigor" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#a6d96a"/><stop offset=".35" stop-color="#66bd63"/><stop offset=".55" stop-color="#d9ef8b"/><stop offset=".75" stop-color="#1a9850"/><stop offset="1" stop-color="#66bd63"/></linearGradient></defs>
-        <path d="M40 112 190 177v16L40 128z" fill="var(--soil-ap)"/><path d="M40 128 190 193v18L40 146z" fill="var(--soil-bw)"/><path d="M40 146 190 211v14L40 160z" fill="var(--soil-c)"/>
-        <path d="M190 177 360 106v16l-170 71z" fill="var(--soil-ap)" opacity=".85"/><path d="M190 193 360 122v18l-170 71z" fill="var(--soil-bw)" opacity=".85"/><path d="M190 211 360 140v14l-170 71z" fill="var(--soil-c)" opacity=".85"/>
-        <path d="M210 42 360 106 190 177 40 112z" fill="url(#cartel-vigor)" opacity=".9"/>
-      </svg>
+      <picture class="cartel">
+        <source data-oscuro="(max-width: 860px)" media="(max-width: 860px) and (prefers-color-scheme: dark)" type="image/webp" sizes="calc(100vw - 32px)" srcset="/inicio/cartel/movil-oscuro-480.webp 480w, /inicio/cartel/movil-oscuro-720.webp 720w">
+        <source media="(max-width: 860px)" type="image/webp" sizes="calc(100vw - 32px)" srcset="/inicio/cartel/movil-claro-480.webp 480w, /inicio/cartel/movil-claro-720.webp 720w">
+        <source data-oscuro="all" media="(prefers-color-scheme: dark)" type="image/webp" sizes="min(calc(58vw - 70px), calc(115vh - 260px))" srcset="/inicio/cartel/pc-oscuro-900.webp 900w, /inicio/cartel/pc-oscuro-1400.webp 1400w">
+        <img src="/inicio/cartel/pc-claro-900.webp" srcset="/inicio/cartel/pc-claro-900.webp 900w, /inicio/cartel/pc-claro-1400.webp 1400w" sizes="min(calc(58vw - 70px), calc(115vh - 260px))" alt="" fetchpriority="high" decoding="async">
+      </picture>
       <canvas id="campo" role="img" aria-label="Parcela de maíz en 3D que se siembra, crece y se cosecha mientras bajas por la página"></canvas>
       <div class="etiquetas" id="etiquetas"></div>
-      <div class="leyenda" id="leyenda" style="opacity:0">
+      <div class="leyenda" id="leyenda">
         <span class="tit" id="leyendaTit">Vigor de campañas anteriores</span>
         <div class="rampa" id="leyendaRampa"></div>
         <div class="ext"><span id="leyendaMin">bajo</span><span id="leyendaMax">alto</span></div>
@@ -491,6 +493,13 @@ document.querySelectorAll('.me-interesa').forEach((b) => b.addEventListener('cli
 // ---------- tema claro / oscuro ----------
 (() => {
   const root = document.documentElement;
+  // La captura del 3D (.cartel) en oscuro va con el sistema (media de sus <source>), salvo que se haya
+  // elegido tema con el botón: entonces se cambia aquí y, si es el otro, se baja esa captura.
+  const temaDelCartel = () => {
+    const t = root.dataset.theme;
+    for (const s of document.querySelectorAll('.cartel source[data-oscuro]')) s.media = t === 'light' ? 'not all' : t === 'dark' ? s.dataset.oscuro : `${s.dataset.oscuro} and (prefers-color-scheme: dark)`;
+  };
+  if (root.dataset.theme) temaDelCartel();
   const dark = () => root.dataset.theme ? root.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
   document.getElementById('tema').addEventListener('click', () => {
     const next = dark() ? 'light' : 'dark';
@@ -498,8 +507,25 @@ document.querySelectorAll('.me-interesa').forEach((b) => b.addEventListener('cli
     const sistema = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
     if (next === sistema) delete root.dataset.theme; else root.dataset.theme = next;
     try { if (next === sistema) sessionStorage.removeItem('surco-tema'); else sessionStorage.setItem('surco-tema', next); } catch (e) {}
+    temaDelCartel();
   });
 })();
+
+// ---------- medidas de la página ----------
+// Antes que el 3D: la cabecera fija marca dónde se quedan la parcela y los textos (si no, al llegar el
+// 3D el escenario cambiaba de alto).
+const cabecera = document.querySelector('.cab');
+// Altura a la que se queda quieto cada texto: justo bajo la barra en el móvil (la parcela va abajo); en escritorio,
+// un poco por debajo de la cabecera.
+const lineaTexto = () => innerWidth <= 860 ? cabecera.offsetHeight : cabecera.offsetHeight + innerHeight * 0.14;
+function medidas() {
+  document.documentElement.style.setProperty('--cab-h', cabecera.offsetHeight + 'px');
+  document.documentElement.style.setProperty('--linea', lineaTexto() + 'px');
+  const col = document.querySelector('.paso').getBoundingClientRect(); // en el móvil .pasos no tiene caja
+  document.documentElement.style.setProperty('--col-x', col.left + 'px');
+  document.documentElement.style.setProperty('--col-w', Math.min(col.width, 544) + 'px');
+}
+medidas(); addEventListener('resize', medidas); document.fonts?.ready.then(medidas);
 
 // ---------- pestañas de la app ----------
 (() => {
@@ -540,45 +566,73 @@ const sin3d = () => {
   document.documentElement.classList.add('sin-fijos');
 };
 
+const noVa = (e) => { console.error(e); sin3d(); };
+
+// ---------- leyenda de los mapas ----------
+// Las mismas escalas que la pestaña Satélite de la app. La del vigor ya se ve con la captura.
+const NDVI_STOPS = [[0, [165, 0, 38]], [0.15, [215, 48, 39]], [0.25, [244, 109, 67]], [0.35, [253, 174, 97]], [0.45, [254, 224, 139]], [0.55, [217, 239, 139]], [0.65, [166, 217, 106]], [0.75, [102, 189, 99]], [0.85, [26, 152, 80]], [1, [0, 104, 55]]];
+const NDMI_STOPS = [[-0.4, [140, 81, 10]], [-0.2, [216, 179, 101]], [0, [246, 232, 195]], [0.15, [171, 217, 233]], [0.3, [116, 173, 209]], [0.45, [49, 130, 189]], [0.6, [8, 69, 148]]];
+const LEY = {
+  vigor: ['Vigor de campañas anteriores · NDVI', 'bajo', 'alto', NDVI_STOPS],
+  agua: ['Agua en la planta · NDMI', 'seca', 'húmeda', NDMI_STOPS],
+  ndvi: ['Vigor hoy · NDVI', 'bajo', 'alto', NDVI_STOPS],
+};
+function pintarLeyenda(modo) {
+  const L = LEY[modo], lo = L[3][0][0], hi = L[3][L[3].length - 1][0], $ = (id) => document.getElementById(id);
+  $('leyendaTit').textContent = L[0]; $('leyendaMin').textContent = L[1]; $('leyendaMax').textContent = L[2];
+  $('leyendaRampa').style.background = `linear-gradient(90deg, ${L[3].map(([v, c]) => `rgb(${c}) ${(((v - lo) / (hi - lo)) * 100).toFixed(1)}%`).join(', ')})`;
+}
+
 // ---------- cuándo arranca el 3D ----------
-// Después del texto y sin estorbarlo (#178): Three.js, los modelos y las texturas pesan varios MB y
-// montar la escena ocupa el procesador. Mientras, se ve el dibujo fijo de la parcela (.cartel).
-// Arranca al primer toque, scroll, tecla o movimiento del ratón, o cuando la página lleva un rato
-// cargada y el navegador está libre; y solo si la parcela está a la vista o cerca. Con «reducir
-// movimiento», nada de 3D: el dibujo fijo y los textos uno detrás de otro.
-if (matchMedia('(prefers-reduced-motion: reduce)').matches) document.documentElement.classList.add('sin-fijos');
+// Después del texto y sin estorbarlo (#178): Three.js y las texturas pesan y montar la escena ocupa el
+// procesador. Mientras, se ve la captura de su primer fotograma (.cartel). Arranca en cuanto la página
+// ha cargado y el navegador está libre (o antes, al primer toque o scroll), si la parcela está a la
+// vista o cerca. Con «reducir movimiento», nada de 3D: la captura y los textos uno detrás de otro.
+// Con ?cartel=movil|pc, la página solo pinta ese primer fotograma para sacar la captura (compilacion/cartelPortada.ts).
+const CAPTURA = new URLSearchParams(location.search).get('cartel');
+pintarLeyenda('vigor');
+if (CAPTURA) escena3d().catch(noVa);
+else if (matchMedia('(prefers-reduced-motion: reduce)').matches) document.documentElement.classList.add('sin-fijos');
 else {
   let quiere = false, cerca = false, empezado = false;
   const intentar = () => {
     if (empezado || !quiere || !cerca) return;
     empezado = true;
     QUIEN_DESPIERTA.forEach((ev) => removeEventListener(ev, despertar));
-    escena3d().catch(sin3d);
+    escena3d().catch(noVa);
   };
   const despertar = () => { quiere = true; intentar(); };
   const QUIEN_DESPIERTA = ['scroll', 'pointerdown', 'pointermove', 'touchstart', 'keydown', 'wheel'];
   QUIEN_DESPIERTA.forEach((ev) => addEventListener(ev, despertar, { passive: true }));
-  const libre = (f) => ('requestIdleCallback' in window ? requestIdleCallback(f, { timeout: 2000 }) : setTimeout(f, 200));
-  const trasCargar = () => setTimeout(() => libre(despertar), 2500);
+  const trasCargar = () => ('requestIdleCallback' in window ? requestIdleCallback(despertar, { timeout: 300 }) : setTimeout(despertar, 50));
   if (document.readyState === 'complete') trasCargar(); else addEventListener('load', trasCargar, { once: true });
   new IntersectionObserver(([e]) => { cerca = e.isIntersecting; intentar(); }, { rootMargin: '50%' }).observe(document.querySelector('.lienzo'));
 }
 
 // ---------- escena 3D ----------
 async function escena3d() {
-  const [THREE, { EffectComposer }, { RenderPass }, { GTAOPass }, { OutputPass }, { Sky }, { HDRLoader }, { GLTFLoader }, { DRACOLoader }] = await Promise.all([
+  const [THREE, { EffectComposer }, { RenderPass }, { GTAOPass }, { OutputPass }, { HDRLoader }, { GLTFLoader }, { DRACOLoader }] = await Promise.all([
     import('three'),
     import('three/addons/postprocessing/EffectComposer.js'),
     import('three/addons/postprocessing/RenderPass.js'),
     import('three/addons/postprocessing/GTAOPass.js'),
     import('three/addons/postprocessing/OutputPass.js'),
-    import('three/addons/objects/Sky.js'),
     import('three/addons/loaders/HDRLoader.js'),
     import('three/addons/loaders/GLTFLoader.js'),
     import('three/addons/loaders/DRACOLoader.js'),
   ]);
-  // En el móvil, menos: sin el cielo HDR (1,4 MB; se queda el calculado) y menos píxeles.
-  const movil = innerWidth <= 860;
+  const CIELO = '/inicio/hdri/kloofendal_48d_partly_cloudy_puresky_128.hdr';
+  const PROPORCION_CARTEL = 10.6 / 9.2; // ancho / alto del encuadre de la parcela (y de la captura)
+  // La escena empieza en el instante de la captura: el mapa del vigor entero y el barrido casi quieto.
+  const T_CARTEL = (Math.PI / 2 + 1.4) / 0.55;
+  // En el móvil, menos píxeles, sombras más bastas y sin oclusión ambiental (la captura de cada uno, igual).
+  const movil = CAPTURA ? CAPTURA === 'movil' : innerWidth <= 860;
+  // Lo que hace falta para el primer fotograma se pide ya, a la vez: la tierra escaneada (Poly Haven,
+  // CC0; color, normales, rugosidad y desplazamiento, a 512 px: se repite 4 × 3) y el cielo que la
+  // ilumina. El 3D no se enseña hasta tenerlo todo (#178): sin el cielo, los mapas salían lavados.
+  const texLoader = new THREE.TextureLoader();
+  const mudListas = Promise.all(['diff', 'nor_gl', 'rough', 'disp'].map((n) => texLoader.loadAsync('/inicio/texturas/brown_mud_dry_' + n + '_512.jpg')));
+  const cieloListo = fetch(CIELO).then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(r.status)));
 
   const W = 16, D = 12, T = 2.4;
   const LAYERS = [
@@ -588,6 +642,9 @@ async function escena3d() {
   ];
 
   // utilidades
+  // Montar la escena se hace a trozos, devolviendo el hilo entre uno y otro: así no hay una tarea
+  // larga que deje la página sin responder a un toque mientras tanto.
+  const ceder = () => ('scheduler' in window && scheduler.yield ? scheduler.yield() : new Promise((r) => setTimeout(r)));
   const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
   const sm = (x) => { x = clamp(x); return x * x * (3 - 2 * x); };
   const lerp = (a, b, t) => a + (b - a) * t;
@@ -614,9 +671,6 @@ async function escena3d() {
       return stops[stops.length - 1][1];
     };
   }
-  // Las mismas escalas que la pestaña Satélite de la app
-  const NDVI_STOPS = [[0, [165, 0, 38]], [0.15, [215, 48, 39]], [0.25, [244, 109, 67]], [0.35, [253, 174, 97]], [0.45, [254, 224, 139]], [0.55, [217, 239, 139]], [0.65, [166, 217, 106]], [0.75, [102, 189, 99]], [0.85, [26, 152, 80]], [1, [0, 104, 55]]];
-  const NDMI_STOPS = [[-0.4, [140, 81, 10]], [-0.2, [216, 179, 101]], [0, [246, 232, 195]], [0.15, [171, 217, 233]], [0.3, [116, 173, 209]], [0.45, [49, 130, 189]], [0.6, [8, 69, 148]]];
   const ndvi = ramp(NDVI_STOPS), ndmi = ramp(NDMI_STOPS);
 
   // datos de la parcela (coordenadas de campo: x 0..W, y 0..D; y=0 es el fondo)
@@ -686,8 +740,12 @@ async function escena3d() {
   // renderer
   const cv = document.getElementById('campo');
   const lienzo = cv.parentElement;
+  if (CAPTURA) { // el lienzo con la proporción y el ancho de la captura, a un píxel por píxel
+    const ancho = Number(new URLSearchParams(location.search).get('ancho')) || 1400;
+    Object.assign(lienzo.style, { position: 'fixed', left: 0, top: 0, zIndex: 99, flex: 'none', width: ancho + 'px', height: Math.round(ancho / PROPORCION_CARTEL) + 'px' });
+  }
   let renderer;
-  try { renderer = new THREE.WebGLRenderer({ canvas: cv, antialias: true, alpha: true }); } catch (e) { sin3d(); return; }
+  try { renderer = new THREE.WebGLRenderer({ canvas: cv, antialias: true, alpha: true, preserveDrawingBuffer: !!CAPTURA }); } catch (e) { sin3d(); return; }
   window.__surco3d = true;
   document.documentElement.classList.remove('sin-fijos'); document.querySelector('.sin3d')?.remove(); // si llegó tarde
   renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -700,36 +758,28 @@ async function escena3d() {
   function resize() {
     const r = lienzo.getBoundingClientRect();
     cw = Math.max(1, r.width); ch = Math.max(1, r.height);
-    const pr = Math.min(movil ? 1.5 : 1.75, window.devicePixelRatio || 1);
+    const pr = CAPTURA ? 1 : Math.min(movil ? 1.5 : 1.75, window.devicePixelRatio || 1);
     renderer.setPixelRatio(pr);
     renderer.setSize(cw, ch, false);
-    if (composer) { composer.setPixelRatio(pr); composer.setSize(cw, ch); gtao.enabled = cw >= 560; }
+    if (composer) { composer.setPixelRatio(pr); composer.setSize(cw, ch); gtao.enabled = !movil; }
     camera.aspect = cw / ch; camera.updateProjectionMatrix();
     document.querySelectorAll('.etq').forEach((e) => { e._w = 0; });
   }
   new ResizeObserver(resize).observe(lienzo);
   resize();
 
-  // luces: cielo físico convertido en mapa de entorno (iluminación HDR) + sol con sombras
+  // luces: cielo real (Poly Haven, CC0) como mapa de entorno + sol con sombras. Es una copia pequeña
+  // (128 × 64, compilacion/cieloPortada.ts) del de 1k: la misma luz en 32 KB en vez de 1,4 MB.
   const SUN = new THREE.Vector3(9, 20, 5);
   const pmrem = new THREE.PMREMGenerator(renderer);
-  {
-    const sky = new Sky(); sky.scale.setScalar(1000);
-    const u = sky.material.uniforms;
-    u.turbidity.value = 5; u.rayleigh.value = 1.4; u.mieCoefficient.value = 0.004; u.mieDirectionalG.value = 0.8;
-    u.sunPosition.value.copy(SUN).normalize();
-    const skyScene = new THREE.Scene(); skyScene.add(sky);
-    scene.environment = pmrem.fromScene(skyScene, 0.02).texture;
-  }
-  // HDRI real (Poly Haven, CC0); mientras carga se usa el cielo calculado
-  if (!movil) fetch('/inicio/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr').then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(r.status))).then((buf) => {
+  const cieloPuesto = cieloListo.then((buf) => {
     const data = new HDRLoader().parse(buf);
     const hdr = new THREE.DataTexture(data.data, data.width, data.height, THREE.RGBAFormat, data.type);
     hdr.colorSpace = THREE.LinearSRGBColorSpace; hdr.mapping = THREE.EquirectangularReflectionMapping;
     hdr.minFilter = hdr.magFilter = THREE.LinearFilter; hdr.flipY = true; hdr.needsUpdate = true;
     scene.environment = pmrem.fromEquirectangular(hdr).texture;
     hdr.dispose();
-  }).catch(() => { /* se queda el cielo calculado */ });
+  }).catch(() => { /* sin cielo: solo el sol y la luz de ambiente */ });
   const hemi = new THREE.HemisphereLight(0xe4eef5, 0x5a4632, 0.5);
   scene.add(hemi);
   const sun = new THREE.DirectionalLight(0xfff0d8, 2.8);
@@ -792,6 +842,7 @@ async function escena3d() {
   const grain = grainTexture();
   const grainNormal = normalFrom(grain.image, 3.5);
 
+  await ceder();
   // capas de suelo
   const layerMeshes = LAYERS.map((L) => {
     const tex = grain.clone(); tex.needsUpdate = true; tex.repeat.set(4, L.th * 1.2);
@@ -802,6 +853,7 @@ async function escena3d() {
     return m;
   });
 
+  await ceder();
   // superficie: plano con caballones + textura que se pinta con los datos
   const K = 40, STW = W * K, STH = D * K;
   const surfCanvas = document.createElement('canvas'); surfCanvas.width = STW; surfCanvas.height = STH;
@@ -809,16 +861,11 @@ async function escena3d() {
   const dataCanvas = document.createElement('canvas'); dataCanvas.width = GX; dataCanvas.height = GY;
   const dctx = dataCanvas.getContext('2d');
   const dimg = dctx.createImageData(GX, GY);
-  // tierra real escaneada (Poly Haven, CC0): color, normales, rugosidad y desplazamiento, a 512 px (se repite 4 × 3: no hace falta más)
-  const texLoader = new THREE.TextureLoader();
+  // la tierra escaneada (pedida al principio)
   const aniso = renderer.capabilities.getMaxAnisotropy();
-  const mud = (name, srgb) => {
-    const t = texLoader.load('/inicio/texturas/brown_mud_dry_' + name + '_512.jpg');
-    t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(4, 3); t.anisotropy = aniso;
-    if (srgb) t.colorSpace = THREE.SRGBColorSpace;
-    return t;
-  };
-  const mudDiff = mud('diff', true), mudNor = mud('nor_gl'), mudRough = mud('rough'), mudDisp = mud('disp');
+  const [mudDiff, mudNor, mudRough, mudDisp] = await mudListas;
+  mudDiff.colorSpace = THREE.SRGBColorSpace;
+  [mudDiff, mudNor, mudRough, mudDisp].forEach((t) => { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(4, 3); t.anisotropy = aniso; });
   const surfTex = new THREE.CanvasTexture(surfCanvas);
   surfTex.colorSpace = THREE.SRGBColorSpace;
   surfTex.anisotropy = aniso;
@@ -938,6 +985,7 @@ async function escena3d() {
     surfTex.needsUpdate = true;
   }
 
+  await ceder();
   // maíz con instancias
   function leafGeometry() {
     const n = 12, pos = [], idx = [], uv = [];
@@ -1039,6 +1087,7 @@ async function escena3d() {
     if (cambia) [stalks, leaves, cobs, tassels].forEach((m) => { m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true; });
   }
 
+  await ceder();
   // piedras sueltas sobre la tierra
   const NPEB = 450;
   const pebbles = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 1), new THREE.MeshStandardMaterial({ roughness: 0.85, transparent: true }), NPEB);
@@ -1049,6 +1098,7 @@ async function escena3d() {
   }
   field.add(pebbles);
 
+  await ceder();
   // máquinas
   function machineMats() {
     return {
@@ -1127,7 +1177,7 @@ async function escena3d() {
     }).catch(() => {});
   }
   const PINTURA = 'verde'; // 'azul' para la versión azul (las dos sin logotipos)
-  swapModel(tractor, `/inicio/modelos/tractor_${PINTURA}.glb`); swapModel(combine, `/inicio/modelos/cosechadora_${PINTURA}.glb`);
+  const cargarModelos = () => { swapModel(tractor, `/inicio/modelos/tractor_${PINTURA}.glb`); swapModel(combine, `/inicio/modelos/cosechadora_${PINTURA}.glb`); };
   function placeMachine(mc, ps, alpha) {
     if (!ps || ps.turning || alpha <= 0.01) { mc.g.visible = false; return; }
     mc.g.visible = true;
@@ -1225,6 +1275,7 @@ async function escena3d() {
   const shadowCatcher = new THREE.Mesh(new THREE.PlaneGeometry(120, 120), new THREE.ShadowMaterial({ opacity: 0.2 }));
   shadowCatcher.rotation.x = -Math.PI / 2; shadowCatcher.receiveShadow = true; field.add(shadowCatcher);
 
+  await ceder();
   // parcelas vecinas (vista final)
   const neighbours = [];
   for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) {
@@ -1245,6 +1296,7 @@ async function escena3d() {
     neighbours.push({ grp, mats: [sideMat, topMat] });
   }
 
+  await ceder();
   function applyTheme() {
     LAYERS.forEach((L, k) => layerMeshes[k].material.color.set(tk[L.tok]));
     soilMat.color.set(isDark ? 0xa9a39b : 0xffffff);
@@ -1311,18 +1363,6 @@ async function escena3d() {
   // ---------- estado según el scroll ----------
   const pasos = [...document.querySelectorAll('.paso')];
   const escenario = document.querySelector('.escenario');
-  const cabecera = document.querySelector('.cab');
-  // Altura a la que se queda quieto cada texto: justo bajo la barra en el móvil (la parcela va abajo); en escritorio,
-  // un poco por debajo de la cabecera.
-  const lineaTexto = () => innerWidth <= 860 ? cabecera.offsetHeight : cabecera.offsetHeight + innerHeight * 0.14;
-  function medidas() {
-    document.documentElement.style.setProperty('--cab-h', cabecera.offsetHeight + 'px');
-    document.documentElement.style.setProperty('--linea', lineaTexto() + 'px');
-    const col = document.querySelector('.paso').getBoundingClientRect(); // en el móvil .pasos no tiene caja
-    document.documentElement.style.setProperty('--col-x', col.left + 'px');
-    document.documentElement.style.setProperty('--col-w', Math.min(col.width, 544) + 'px');
-  }
-  medidas(); addEventListener('resize', medidas);
   function scrollP() {
     const vh = window.innerHeight;
     const movil = innerWidth <= 860;
@@ -1348,10 +1388,8 @@ async function escena3d() {
     return { mode: m, sweep: 1.15 * (i - o) };
   }
 
-  const t0 = performance.now() / 1000;
   let lastSurf = '', lastPlants = '', lastRidge = -1;
   function render(P, t) {
-    const appear = sm((t - t0) / 1.4);
     const open = bump(P, 1.55, 2.0, 2.6, 2.95), sep = open * 0.95;
     const dv = dataView(P, t);
     const tractT = ritmo(clamp((P - 3.12) / 0.8)); // al pararse en «siembra», el tractor va por mitad de la parcela
@@ -1365,15 +1403,17 @@ async function escena3d() {
     const behind = bump(P, 5.12, 5.4, 5.8, 5.97);
 
     // cámara
-    const aspect = cw / ch, tv = Math.tan(THREE.MathUtils.degToRad(14));
-    let R = Math.max(10.6 / (tv * aspect), 9.2 / tv);
-    R *= lerp(1, 2.7, zoom);
+    // La parcela cabe a lo alto en un lienzo ancho y a lo ancho en uno estrecho, con la cámara siempre a
+    // la misma distancia (el estrecho abre el ángulo con zoom): así encaja igual que la captura con «contain».
+    const tv = Math.tan(THREE.MathUtils.degToRad(14));
+    const abre = Math.min(1, cw / ch / PROPORCION_CARTEL);
+    if (camera.zoom !== abre) { camera.zoom = abre; camera.updateProjectionMatrix(); }
+    const R = (9.2 / tv) * lerp(1, 2.7, zoom);
     const az = THREE.MathUtils.degToRad(40 + P * 3 + Math.sin(t * 0.18) * 1.2);
     const el = THREE.MathUtils.degToRad(lerp(31, 50, zoom) - open * 7);
-    const ty = lerp(-0.2, -1.2, open) - (1 - appear) * 0;
+    const ty = lerp(-0.2, -1.2, open);
     camera.position.set(R * Math.cos(el) * Math.sin(az), ty + R * Math.sin(el), R * Math.cos(el) * Math.cos(az));
     camera.lookAt(0, ty, 0);
-    field.position.y = (1 - appear) * 3;
 
     // capas
     LAYERS.forEach((L, k) => { layerMeshes[k].position.y = -(L.top + L.th / 2) - sep * k; });
@@ -1461,13 +1501,8 @@ async function escena3d() {
     ['Julio–agosto · vigilancia', 'R1 · día 95'], ['Octubre · cosecha', 'R6 · día 180'], ['Después de cosechar', 'campaña cerrada'],
   ];
   const POS = [0, 0.03, 0.14, 0.27, 0.53, 0.68, 0.76, 0.98, 1];
-  const LEY = {
-    vigor: ['Vigor de campañas anteriores · NDVI', 'bajo', 'alto', NDVI_STOPS],
-    agua: ['Agua en la planta · NDMI', 'seca', 'húmeda', NDMI_STOPS],
-    ndvi: ['Vigor hoy · NDVI', 'bajo', 'alto', NDVI_STOPS],
-  };
   const $ = (id) => document.getElementById(id);
-  let lastActive = -1, lastMode = null;
+  let lastActive = -1, lastMode = 'vigor'; // la del vigor ya está pintada
   // Los textos van con el scroll real (sin suavizar): así nunca se quedan atrás ni repasan la
   // historia entera al volver arriba de golpe. Solo se ve el del paso en curso; la portada y el
   // último van en el flujo de la página y entran y salen con ella.
@@ -1492,12 +1527,7 @@ async function escena3d() {
     const i = Math.floor(clamp(P, 0, 7.999)), f = lerp(POS[i], POS[i + 1], P - i);
     $('relleno').style.width = (f * 100).toFixed(2) + '%';
     $('punto').style.left = (f * 100).toFixed(2) + '%';
-    if (dv.mode && dv.mode !== lastMode) {
-      const L = LEY[dv.mode], lo = L[3][0][0], hi = L[3][L[3].length - 1][0];
-      $('leyendaTit').textContent = L[0]; $('leyendaMin').textContent = L[1]; $('leyendaMax').textContent = L[2];
-      $('leyendaRampa').style.background = `linear-gradient(90deg, ${L[3].map(([v, c]) => `rgb(${c}) ${(((v - lo) / (hi - lo)) * 100).toFixed(1)}%`).join(', ')})`;
-      lastMode = dv.mode;
-    }
+    if (dv.mode && dv.mode !== lastMode) { pintarLeyenda(dv.mode); lastMode = dv.mode; }
     $('leyenda').style.opacity = dv.mode ? clamp(dv.sweep * 2.5).toFixed(2) : 0;
   }
 
@@ -1506,7 +1536,12 @@ async function escena3d() {
   const MAQUINAS = [[3.12 - 0.35, 3.92 - 0.35, 0.8 / 2.2], [7.15 - 0.35, 7.7 - 0.35, 0.55 / 2.2]];
   const maquina = (a, b) => MAQUINAS.find(([i, f]) => Math.max(a, b) > i && Math.min(a, b) < f);
   const cruzaMaquina = (a, b) => !!maquina(a, b);
-  let Ps = scrollP(), onScreen = true, tFrame = null;
+  // Antes de enseñarse, todo lo del primer fotograma: el cielo puesto y los shaders compilados.
+  await cieloPuesto;
+  await renderer.compileAsync(scene, camera);
+  if (CAPTURA) { render(0.35, T_CARTEL); document.documentElement.dataset.cartel = 'listo'; return; }
+
+  let Ps = scrollP(), onScreen = true, tFrame = null, tInicio = null;
   new IntersectionObserver(([e]) => { onScreen = e.isIntersecting; }).observe(escenario);
   function frame(now) {
     requestAnimationFrame(frame);
@@ -1528,10 +1563,17 @@ async function escena3d() {
     // alertas) va a unas 30 imágenes por segundo: no se nota y el teléfono va más suelto (#178).
     if (movil && Ps === target && Ps === psPintado && now - tPintado < 33) return;
     psPintado = Ps; tPintado = now;
-    ui(Ps, render(Ps + 0.35, t));
-    if (!lienzo.classList.contains('con3d')) lienzo.classList.add('con3d'); // fuera el dibujo fijo
+    tInicio ??= t;
+    ui(Ps, render(Ps + 0.35, T_CARTEL + t - tInicio));
+    // Pintado el primer fotograma (aún invisible), el 3D se funde sobre la captura, que es igual.
+    if (!revelado) {
+      revelado = true;
+      requestAnimationFrame(() => lienzo.classList.add('con3d'));
+      // Los modelos de las máquinas (3 MB), solo si se baja por la página: no salen hasta la siembra.
+      if (scrollY > 0) cargarModelos(); else addEventListener('scroll', cargarModelos, { once: true, passive: true });
+    }
   }
-  let psPintado = null, tPintado = 0;
+  let psPintado = null, tPintado = 0, revelado = false;
   requestAnimationFrame(frame);
 }
 </script>
